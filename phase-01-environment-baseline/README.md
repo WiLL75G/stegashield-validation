@@ -3,122 +3,173 @@
 
 **StegaShield Detection Validation Pilot**
 
-**Focus:** Laboratory readiness, endpoint telemetry, network monitoring, and Sysmon Event ID 3 investigation.
+**Focus:** Laboratory readiness, network monitoring, Windows endpoint telemetry, and Sysmon Event ID 3 investigation.
 
-[Back to Main Project](../README.md)
+[← Back to Main Project](../README.md)
 
 ---
 
-## Objective
+## 1. Objective
 
-Before testing StegaShield, I needed to establish a reliable laboratory environment and verify that my monitoring tools were producing usable security telemetry.
+Before testing StegaShield, I needed to establish a reliable SOC laboratory and verify that my security monitoring tools were collecting usable telemetry.
 
-My objective was not simply to confirm that the tools were installed.
+My goal was not simply to confirm that Splunk, Sysmon, Zeek, and Docker were installed.
 
-I wanted to verify that network activity could be observed, Windows events could be collected, and the resulting evidence could be investigated in Splunk Enterprise.
+I wanted to establish that:
 
-The initial investigation focused on Windows Sysmon, Splunk, Zeek, and Docker readiness.
+- The laboratory systems could communicate.
+- Splunk Enterprise was operational.
+- Windows endpoint events were being collected.
+- Sysmon network connection events were available.
+- Windows telemetry was searchable in Splunk.
+- Zeek was generating network metadata.
+- Docker was ready for the later StegaShield deployment.
 
-## Laboratory Environment
+This baseline was important because the later detection experiments would depend on reliable endpoint and network evidence.
 
-The pilot used a Mac M2 host with Windows 11 and Ubuntu virtual machines.
+## 2. Laboratory Environment
+
+The pilot used a Mac M2 host with Windows 11 and Ubuntu ARM64 virtual machines.
 
 | Component | Technology | Purpose |
 |---|---|---|
-| Host | Mac M2 | Laboratory management |
-| SIEM | Splunk Enterprise | Centralized event investigation |
+| Host workstation | Mac M2 | Laboratory management |
+| SIEM | Splunk Enterprise | Centralized investigation |
 | Windows endpoint | Windows 11 ARM64 | Controlled endpoint activity |
-| Endpoint monitoring | Sysmon | Process and network telemetry |
+| Endpoint monitoring | Sysmon 15.22 | Process and network telemetry |
 | Log forwarding | Splunk Universal Forwarder | Windows event ingestion |
-| Linux VM | Ubuntu 24.04 ARM64 | Network monitoring and analysis |
-| Network sensor | Zeek | Connection and HTTP metadata |
+| Linux system | Ubuntu 24.04 ARM64 | Analysis and monitoring |
+| Network sensor | Zeek 9.0.1 | Network connection and HTTP metadata |
 | Container runtime | Docker | StegaShield deployment preparation |
 
-The main telemetry path was:
+The primary endpoint monitoring path was:
 
 Windows Activity → Sysmon → Splunk Universal Forwarder → Splunk Enterprise
 
-Zeek independently recorded network activity visible on its monitored Ubuntu interface.
+Zeek independently collected network metadata visible on its configured Ubuntu interface.
 
-## 1. Splunk Enterprise Connectivity
+## 3. Splunk Enterprise Verification
 
-I started by checking whether Splunk Enterprise was operational on my Mac.
+I started by verifying that Splunk Enterprise was running on my Mac.
 
 I inspected the Splunk management listener and confirmed that the service was listening.
 
 Next, I tested connectivity from Ubuntu to the Splunk management endpoint.
 
-The controlled HTTPS request returned HTTP 200 OK, and the response identified Splunkd as the responding service.
+The controlled HTTPS request returned HTTP 200 OK.
 
-This confirmed that Ubuntu could reach the Splunk management service.
+The response headers also identified Splunkd as the responding service.
 
-![Ubuntu to Splunk Connectivity](evidence/01-splunk-connectivity.png)
+### Observation
 
-**Observation:** Splunk was accessible from Ubuntu over the tested network path.
+Ubuntu could successfully communicate with the Splunk management service.
 
-**Limitation:** Successful connectivity did not establish that Ubuntu logs were being forwarded to Splunk.
+### Interpretation
 
-## 2. Zeek Network Monitoring
+The tested network path was operational, and the Splunk management endpoint was accessible.
 
-My next step was to verify that Zeek was collecting network telemetry.
+However, successful connectivity alone did not establish Windows event ingestion or Ubuntu log forwarding.
 
-I inspected the standalone Zeek configuration, checked the monitored interface, and verified the sensor's running state.
+These needed separate verification.
 
-![Zeek Running Status](evidence/02-zeek-status.png)
+## 4. Zeek Network Monitoring Verification
 
-I then inspected the connection logs.
+My next task was to verify the availability of network telemetry.
 
-Zeek had recorded actual network activity, including TCP, UDP, DHCP, and ICMP traffic.
+I inspected Zeek's standalone configuration and checked the monitored Ubuntu interface.
 
-![Zeek Connection Records](evidence/03-zeek-connections.png)
+After starting Zeek, I verified its operational status through ZeekControl.
 
-I also inspected the HTTP log and observed a GET request with an HTTP 204 No Content response.
+The output confirmed that the standalone Zeek instance was running.
 
-These checks demonstrated that Zeek was generating network metadata.
+### Connection Logging
 
-**Observation:** Zeek was operational and producing connection and HTTP records.
+I inspected Zeek's connection log.
 
-**Limitation:** This did not establish complete visibility into all virtual-machine traffic or encrypted HTTPS image contents.
+The records included:
 
-## 3. Sysmon Network Telemetry Investigation
+- TCP connections
+- Rejected TCP connections
+- UDP activity
+- DHCP traffic
+- ICMP traffic
 
-This was the most important investigation in Phase 01.
+This confirmed that Zeek was generating actual connection records rather than only displaying log headers.
 
-I verified that Sysmon was installed and that its driver was running.
+### HTTP Logging
 
-Process creation and termination events were already present.
+I also inspected the Zeek HTTP log.
 
-However, I noticed that Sysmon Event ID 3, which records network connections, was missing from the inspected local event log.
+One observed transaction contained:
 
-This was a problem because later SOC investigations would require network connections to be associated with their originating Windows processes.
+| Field | Observed Value |
+|---|---|
+| Method | GET |
+| Request path | / |
+| Response code | 204 |
+| Response message | No Content |
 
-### Initial Investigation
+The activity was consistent with routine connectivity checking.
 
-I inspected Sysmon's active configuration.
+### Discovery
 
-Network connection monitoring was reported as enabled, but I still could not find the expected Event ID 3 records.
+Zeek was operational and producing network metadata.
 
-![Initial Sysmon Configuration](evidence/04-sysmon-initial-config.png)
+However, its running state did not establish visibility into every virtual-machine network path.
 
-I investigated several possible explanations, including:
+It also did not demonstrate inspection of encrypted HTTPS image contents.
 
-- Sysmon service and driver status
+## 5. Sysmon Event ID 3 Investigation
+
+This became the most important investigation in Phase 01.
+
+While verifying Windows endpoint telemetry, I confirmed that Sysmon was installed and running.
+
+Process creation and termination events were present in the local Sysmon Operational log.
+
+However, network connection Event ID 3 was missing.
+
+This was a significant visibility gap because I needed network connection telemetry for the later SOC investigations.
+
+### 5.1 Initial Observation
+
+The Windows endpoint could establish network connections.
+
+Sysmon was running.
+
+The active configuration reported network connection monitoring as enabled.
+
+Despite these observations, the inspected log contained no matching Event ID 3 records.
+
+This raised an important investigation question:
+
+**Why was successful network activity not producing the expected endpoint telemetry?**
+
+### 5.2 Investigation
+
+Before making configuration changes, I examined several possible explanations.
+
+I checked:
+
+- Sysmon service status
+- Sysmon driver status
 - Registered driver configuration
-- Driver binary and version
-- Digital signature validity
-- Event schema
-- Retained error events
-- Existing monitoring settings
+- Executable and driver versions
+- Driver binary presence
+- Driver digital signature
+- Active event collection configuration
+- Supported Sysmon event schema
+- Retained Sysmon error records
 
-The driver was running and Windows reported a valid digital signature.
+The driver was running, and Windows reported a valid digital signature.
 
-A search for retained Sysmon Event ID 255 records returned no matches.
+A query for retained Event ID 255 records returned no matches.
 
-These checks did not conclusively identify the root cause.
+These observations did not establish the exact root cause.
 
-### Remediation
+### 5.3 Configuration Remediation
 
-I prepared a minimal Sysmon XML configuration containing explicit collection rules for:
+I prepared a minimal Sysmon XML configuration containing explicit collection rules for three event types.
 
 | Event ID | Description |
 |---|---|
@@ -126,65 +177,146 @@ I prepared a minimal Sysmon XML configuration containing explicit collection rul
 | 3 | Network Connection |
 | 5 | Process Termination |
 
-I preserved a report of the original configuration before applying the change.
+Before applying the configuration, I preserved a report of the original active settings.
 
-After applying the XML file, Sysmon reported that the configuration had been successfully validated and updated.
+I then applied the new XML configuration.
 
-![Sysmon Configuration Update](evidence/05-sysmon-config-update.png)
+Sysmon reported:
 
-### Verification
+```text
+Configuration file validated.
+Configuration updated.
+```
 
-I generated another controlled TCP connection and inspected the local Sysmon Operational log.
+I inspected the active configuration again and confirmed that the intended event collection rules were present.
 
-This time, Event ID 3 records appeared.
+### 5.4 Controlled Network Test
 
-![Local Sysmon Event ID 3](evidence/06-sysmon-event3-local.png)
+After applying the configuration, I generated another controlled TCP connection to an existing laboratory service.
 
-The records contained information such as:
+The network connection succeeded.
 
-- Process ID and process GUID
-- Executable path
-- Source IP address and port
-- Destination IP address and port
-- Protocol
+I searched the local Sysmon Operational log for recent Event ID 3 records.
+
+This time, actual network connection events appeared.
+
+The events provided details including:
+
 - Timestamp
+- Process GUID
+- Process ID
+- Executable path
 - User context
+- Protocol
+- Source address and port
+- Destination address and port
 
-**Finding:** Sysmon network connection telemetry was successfully restored following the configuration change.
+### Finding
 
-The exact root cause of the original missing events remained inconclusive.
+**Finding ID:** P01-F01
 
-## 4. Splunk Forwarding Investigation
+**Title:** Missing Sysmon Network Connection Telemetry
 
-During baseline preparation, I also encountered a separate issue.
+**Initial observation:** Event ID 3 was absent from the inspected retained log.
+
+**Action:** Applied a validated configuration with explicit event collection rules.
+
+**Verification:** Event ID 3 appeared locally following the configuration change.
+
+**Disposition:** Resolved.
+
+**Root cause:** Not conclusively established.
+
+### What I Learned
+
+Successful connectivity does not guarantee that the expected security event has been generated.
+
+A SOC analyst must verify actual telemetry rather than assume that an enabled monitoring setting is functioning correctly.
+
+## 6. Splunk Universal Forwarder Investigation
+
+During baseline preparation, I also encountered a separate issue affecting centralized event ingestion.
 
 The Splunk Universal Forwarder initially received an access-denied error when attempting to subscribe to the Sysmon Operational event channel.
 
-I investigated the forwarder service identity and event-channel permissions.
+This was different from the missing local Event ID 3 problem.
 
-The service identity was added to the local Event Log Readers group, and the forwarder service was restarted.
+The investigation required distinguishing between event generation and log forwarding.
 
-Subsequent searches confirmed that Sysmon events were reaching Splunk.
+### Investigation and Remediation
 
-I then searched for Event ID 3 records.
+I reviewed the forwarder service identity and event-channel access permissions.
 
-![Sysmon Event ID 3 in Splunk](evidence/07-splunk-event3.png)
+The forwarder service identity was added to the local Event Log Readers group.
 
-The results showed network connection events from the Windows endpoint.
+I then restarted the forwarder service.
 
-One record associated the Splunk Universal Forwarder process with an outbound connection to the Splunk receiving service.
+Subsequent Splunk searches confirmed that Sysmon telemetry was being ingested.
 
-This verified the telemetry path:
+### Finding
+
+**Finding ID:** P01-F02
+
+**Title:** Sysmon Event Channel Access Denied
+
+**Initial observation:** The forwarder could not subscribe to the Sysmon Operational channel.
+
+**Action:** Updated event log access permissions and restarted the service.
+
+**Verification:** Sysmon events became searchable in Splunk.
+
+**Disposition:** Resolved.
+
+### SOC Lesson
+
+There are separate stages in the telemetry pipeline:
+
+1. Security activity occurs.
+2. The endpoint generates an event.
+3. The log forwarder accesses the event.
+4. The forwarder sends the event.
+5. The SIEM indexes the event.
+6. The analyst searches and interprets the event.
+
+A failure at any stage can create a monitoring blind spot.
+
+## 7. Sysmon Event ID 3 Verification in Splunk
+
+After restoring local network telemetry, I investigated whether those records were available centrally.
+
+I searched Splunk for Sysmon Event ID 3.
+
+The search returned Windows network connection events.
+
+The available records included:
+
+- Host
+- Process image
+- Source address
+- Destination address
+- Destination port
+- Protocol
+- Event timestamp
+
+One observed connection was associated with the Splunk Universal Forwarder communicating with the Splunk receiving service.
+
+Other network activity included browser-related connections.
+
+### Result
+
+I successfully verified the endpoint telemetry path:
 
 Windows Network Activity → Sysmon Event ID 3 → Splunk Universal Forwarder → Splunk Enterprise
 
-## 5. Final Telemetry Verification
+This confirmed that Event ID 3 was being generated locally and was searchable in Splunk.
 
-After restoring the missing telemetry, I performed a final Splunk search covering a 30-minute window.
+## 8. Final Telemetry Verification
 
-The search returned:
+I performed a final Splunk search covering a 30-minute window.
 
-| Event ID | Description | Events Observed |
+The investigation returned the following event counts:
+
+| Event ID | Description | Count |
 |---|---|---:|
 | 1 | Process Creation | 215 |
 | 3 | Network Connection | 52 |
@@ -192,94 +324,102 @@ The search returned:
 | 16 | Configuration Change | 1 |
 | **Total** | | **485** |
 
-![Final Splunk Event Coverage](evidence/08-splunk-final-events.png)
+The results confirmed that process creation, network connections, process termination, and configuration changes were available in Splunk.
 
-These counts represent the observed search window, not permanent system totals.
+These counts represent the observed 30-minute search window.
 
-The results confirmed that process creation, network connections, process termination, and configuration changes were searchable in Splunk.
+They are not permanent event totals or detection accuracy measurements.
 
-## 6. Investigation Findings
+## 9. Docker Readiness
 
-### Finding 01 — Missing Sysmon Event ID 3
+I also checked the Docker installation on Ubuntu in preparation for the later StegaShield deployment.
 
-**Initial observation:** Network connection events were absent from the inspected local log.
+The Docker service was active.
 
-**Investigation:** Reviewed configuration, driver state, signatures, error records, and controlled network activity.
+The container inventory showed no deployed containers at the time of the baseline inspection.
 
-**Action:** Applied a validated Sysmon configuration with explicit collection rules.
+This confirmed basic container runtime readiness.
 
-**Verification:** Event ID 3 appeared locally and in Splunk.
+StegaShield deployment, API functionality, and detection accuracy were not evaluated during this phase.
 
-**Disposition:** Resolved.
+## 10. Investigation Summary
 
-**Root cause:** Not conclusively established.
+| Finding | Observation | Disposition |
+|---|---|---|
+| P01-F01 | Missing Sysmon Event ID 3 | Resolved |
+| P01-F02 | Splunk forwarding access denied | Resolved |
+| P01-F03 | Limited network visibility guarantees | Documented limitation |
 
-### Finding 02 — Splunk Forwarding Access Denied
+### Verified
 
-**Initial observation:** The forwarder could not subscribe to the Sysmon Operational channel.
+- Splunk Enterprise service accessibility
+- Ubuntu connectivity to the Splunk management endpoint
+- Sysmon service and driver operation
+- Sysmon process telemetry
+- Local Event ID 3 generation after remediation
+- Event ID 3 ingestion into Splunk
+- Splunk Event IDs 1, 3, 5, and 16
+- Zeek standalone operation
+- Zeek connection logging
+- Zeek HTTP logging
+- Docker runtime readiness
 
-**Investigation:** Reviewed service identity and event-channel permissions.
+### Not Established
 
-**Action:** Updated Event Log Readers membership and restarted the forwarder.
+- Definitive root cause of the original missing Event ID 3
+- Complete visibility into every virtual-machine network path
+- Ubuntu Zeek log forwarding into Splunk
+- StegaShield API functionality
+- Steganography detection performance
+- HTTPS image-content inspection
 
-**Verification:** Sysmon records became searchable in Splunk.
+## 11. Key Discoveries
 
-**Disposition:** Resolved.
+### Discovery 01 — Tool Status Is Not Telemetry Verification
 
-### Finding 03 — Network Visibility Boundaries
+Sysmon was running, but the expected network connection events were initially absent.
 
-**Observation:** Zeek generated actual network connection and HTTP metadata.
+This demonstrated that service availability and telemetry availability are different.
 
-**Limitation:** Complete virtual-machine traffic visibility and encrypted image-content inspection were not established.
+### Discovery 02 — Local Events and SIEM Ingestion Are Separate
 
-**Disposition:** Documented for subsequent investigation phases.
+I encountered both an event collection problem and an event-channel access problem.
 
-## 7. What I Discovered
+Resolving one did not automatically resolve the other.
 
-The most important lesson from Phase 01 was that an enabled security feature does not automatically guarantee usable telemetry.
+### Discovery 03 — Correlation Depends on Data Quality
 
-Initially, Sysmon was running and network monitoring was reported as enabled.
+Before investigating suspicious network activity, I needed confidence that endpoint and network records were actually available.
 
-However, Event ID 3 was still missing.
+Without reliable telemetry, an investigation can produce incomplete or misleading conclusions.
 
-I had to investigate the configuration, perform controlled network activity, verify local event generation, and then confirm centralized ingestion in Splunk.
+## 12. Final Outcome
 
-This taught me to distinguish between three questions:
+Phase 01 established the core laboratory monitoring baseline for the StegaShield pilot.
 
-1. Did the activity happen?
-2. Did the endpoint generate the expected event?
-3. Did the SIEM successfully receive and index that event?
+I verified that Splunk was accessible, Zeek was generating network records, and Windows Sysmon telemetry was being forwarded successfully.
 
-Each question requires separate evidence.
+The investigation identified and resolved two separate telemetry problems.
 
-## 8. Limitations
+Most importantly, I restored Sysmon Event ID 3 visibility and confirmed that network connection records were available locally and in Splunk.
 
-The investigation did not conclusively establish the original cause of the missing Sysmon Event ID 3 events.
+The exact cause of the original missing network events remained unresolved.
 
-Zeek's operational status did not prove complete visibility into every laboratory network path.
+### Final Lesson
 
-Ubuntu log forwarding to Splunk was not independently verified during this baseline.
+**An enabled security control does not guarantee useful evidence.**
 
-StegaShield detection performance was outside the scope of Phase 01.
+Before trusting a detection or beginning an investigation, verify the complete telemetry path using actual controlled activity.
 
-## Conclusion
-
-Phase 01 established a working laboratory telemetry baseline.
-
-I verified Splunk connectivity, operational Zeek logging, Windows Sysmon events, and centralized Sysmon ingestion.
-
-The investigation identified and resolved two separate problems affecting network event collection and forwarding.
-
-The main lesson was that security monitoring must be verified through actual events rather than assumptions about tool configuration.
-
-**Phase 01 Outcome: Core technical baseline verified.**
-
-**Evidence publication status:** The original Phase 01 screenshots remain pending recovery and upload. The image references above identify the intended evidence locations and will render only after genuine screenshots are added.
+**Phase 01 Status: Core Technical Baseline Verified.**
 
 ---
 
-**Next: [Phase 02 — Independent Dataset & Ground Truth](../phase-02-independent-dataset/README.md)**
+## Next Phase
 
-[Back to Main Project](../README.md)
+[Phase 02 — Independent Dataset & Ground Truth](../phase-02-independent-dataset/README.md)
+
+[← Back to Main Project](../README.md)
+
 
 

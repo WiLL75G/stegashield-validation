@@ -1,45 +1,61 @@
 
 # StegaShield Detection Validation Pilot
 
-### Independent Detection Validation | SOC Investigation | Reproducibility
+**Independent Detection Validation | SOC Investigation | Reproducibility**
 
-## Overview
+An evidence-driven cybersecurity research project evaluating StegaShield's image steganography detection behavior within a controlled SOC laboratory.
 
-This project documents my independent hands-on evaluation of StegaShield, an image steganography detection tool, within a controlled cybersecurity laboratory.
+## Project Overview
 
-My goal was to investigate how StegaShield responds to known-clean and genuinely modified images, determine whether its classifications match independently established ground truth, and examine how endpoint and network telemetry can support a SOC investigation.
+I conducted this independent pilot to investigate how StegaShield classifies known-clean and genuinely steganographically modified images.
 
-I conducted the pilot over seven practical stages, now organized into eight GitHub documentation phases. The eighth phase consolidates the final technical assessment.
+The goal was not simply to demonstrate a working detection tool. I wanted to establish independent ground truth, test the engine under controlled conditions, investigate unexpected results, and verify whether the associated activity could be reconstructed using SOC telemetry.
 
-The project focuses on practical testing, investigation reasoning, reproducibility, and evidence-backed conclusions rather than simply demonstrating that a security tool works.
+The original hands-on pilot was structured across seven days. For GitHub documentation, I organized the completed work into eight phases, with the final phase serving as the consolidated technical assessment.
+
+Each phase contains its own investigation methodology, observations, discoveries, and selected supporting evidence.
+
+## Laboratory Architecture
+
+The pilot used a Mac M2 host running Splunk Enterprise, together with Windows 11 and Ubuntu ARM64 virtual machines.
+
+The Windows endpoint generated controlled activity and provided Sysmon telemetry. Ubuntu hosted the image-analysis environment and network monitoring components.
+
+![StegaShield Detection Validation Lab Architecture](assets/lab-architecture.png)
+
+**Architecture note:** This is the original laboratory design diagram. It includes both operational components and initially planned integrations. Components shown in the diagram should not automatically be interpreted as successfully integrated or used during the final experiment.
+
+The verified monitoring and testing paths are documented in the relevant phases.
+
+### Core Technologies
+
+| Technology | Purpose |
+|---|---|
+| Windows 11 ARM64 | Controlled endpoint activity |
+| Ubuntu 24.04 ARM64 | Detection service and network analysis |
+| Splunk Enterprise | Centralized SOC investigation |
+| Sysmon | Windows process and network telemetry |
+| Splunk Universal Forwarder | Windows log forwarding |
+| Zeek | Network connection metadata |
+| Docker | StegaShield container deployment |
+| Nginx | HTTPS reverse proxy |
+| Python and Pillow | Independent image generation and modification |
 
 ## Research Objectives
 
-- Build and verify a reliable SOC laboratory.
-- Create an independent dataset with known ground truth.
-- Deploy and validate the StegaShield detection API.
-- Test genuine RGB-LSB steganographic modifications.
-- Investigate incorrect model classifications.
-- Correlate endpoint, network, and application evidence.
-- Verify reproducibility and evidence integrity.
-- Document the findings, limitations, and recommendations.
+The project focused on the following questions:
 
-## Laboratory Environment
+1. Can StegaShield correctly classify a known-clean image?
+2. Can it identify an image containing a genuine RGB-LSB modification?
+3. How do the model's probabilities differ between matching clean and modified images?
+4. Can an embedded payload be independently verified and recovered?
+5. Can Sysmon, Splunk, Zeek, and Nginx evidence support investigation of controlled image submissions?
+6. Are the test artifacts and findings reproducible?
+7. What limitations should be considered before drawing broader conclusions?
 
-| Component | Technology | Role |
-|---|---|---|
-| Host | MacBook Air M2 | Laboratory workstation |
-| Endpoint | Windows 11 ARM64 | Controlled testing activity |
-| Linux Server | Ubuntu ARM64 | Detection service and network monitoring |
-| SIEM | Splunk Enterprise | Centralized investigation |
-| Endpoint Telemetry | Sysmon | Process and network events |
-| Network Monitoring | Zeek | Network connection metadata |
-| Reverse Proxy | Nginx | HTTPS API access |
-| Detection Engine | StegaShield | Image analysis |
-| Container Runtime | Docker | StegaShield deployment |
-| Dataset Generation | Python and Pillow | Independent image generation |
+## Project Phases
 
-## Project Roadmap
+The complete investigation is organized into eight phases.
 
 | Phase | Investigation | Documentation |
 |---|---|---|
@@ -52,55 +68,137 @@ The project focuses on practical testing, investigation reasoning, reproducibili
 | 07 | Reproducibility & Evidence Integrity | [View Phase 07](phase-07-reproducibility-integrity/README.md) |
 | 08 | Consolidated Technical Assessment | [View Phase 08](phase-08-final-assessment/README.md) |
 
-Each phase contains its own methodology, investigation findings, and selected supporting evidence.
+### Phase 01 — Environment & Laboratory Baseline
 
-## Overall Findings
+Established the laboratory infrastructure and verified endpoint and network monitoring.
 
-The pilot produced two primary detection outcomes:
+Investigated missing Sysmon Event ID 3 telemetry and verified network event collection in Splunk following remediation.
 
-| Sample | Ground Truth | Prediction | Outcome |
+### Phase 02 — Independent Dataset & Ground Truth
+
+Created an independently generated image dataset using Python and Pillow.
+
+Established clean and RGB-LSB-modified samples with known labels, controlled payloads, and SHA-256 fingerprints.
+
+### Phase 03 — StegaShield Deployment & Clean Baseline
+
+Deployed StegaShield on Ubuntu using Docker.
+
+Verified the detection service and established a baseline classification using a known-clean image.
+
+### Phase 04 — RGB-LSB Detection Validation
+
+Evaluated StegaShield against an image containing a genuine 23-byte RGB-LSB embedded payload.
+
+Recorded the model's response and compared it against independent ground truth.
+
+### Phase 05 — Error Analysis & Generalization Limits
+
+Investigated the observed false-negative classification.
+
+Compared model probabilities, reviewed repeated analysis records, and documented the limitations of the controlled experiment.
+
+### Phase 06 — HTTPS & SOC Telemetry Correlation
+
+Performed authorized HTTPS image submissions from Windows to Ubuntu.
+
+Investigated process, network, and application activity using Sysmon, Splunk, Zeek, and Nginx.
+
+### Phase 07 — Reproducibility & Evidence Integrity
+
+Reviewed image-generation and reproduction scripts, verified SHA-256 checksums, recovered the embedded payload, and confirmed temporary-file cleanup.
+
+### Phase 08 — Consolidated Technical Assessment
+
+Consolidates the investigation findings, evidence references, detection results, SOC observations, limitations, and recommendations into a final technical assessment.
+
+This is a documentation phase, not an additional experiment.
+
+---
+
+## Key Research Findings
+
+The controlled test produced the following detection outcomes:
+
+| Sample | Ground Truth | Prediction | Result |
 |---|---|---|---|
 | Clean reference image | CLEAN | clean | True Negative |
 | RGB-LSB modified image | MODIFIED | clean | False Negative |
 
-StegaShield correctly classified the known-clean image but failed to identify the corresponding image containing a controlled 23-byte RGB-LSB payload.
+StegaShield correctly classified the clean reference image but failed to identify the corresponding image containing a controlled 23-byte RGB-LSB payload.
 
-The embedded payload was subsequently recovered, confirming that the modified image contained the expected data.
+The modified image was classified as `clean`, despite independently established ground truth and subsequent successful payload recovery.
 
-The SOC investigation also demonstrated how Sysmon, Splunk, Zeek, and Nginx records could be correlated to reconstruct authorized image-submission activity.
+The investigation also demonstrated how multiple SOC telemetry sources could be correlated to reconstruct the authorized image submissions.
 
-These findings apply to the tested samples and environment. They do not establish the detection engine's overall accuracy or performance across other datasets.
+**These findings apply to the specific samples and tested deployment. They do not establish overall StegaShield accuracy, production reliability, or performance across other steganography methods.**
 
-## Investigation Approach
+## Investigation Methodology
 
-The project follows an evidence-driven methodology:
+The pilot followed an evidence-driven workflow:
 
-**Baseline → Controlled Testing → Observation → Investigation → Correlation → Verification → Documentation**
+**Baseline → Controlled Activity → Observation → Investigation → Correlation → Verification → Documentation**
 
-Every reported finding must be supported by actual laboratory evidence.
+Each phase distinguishes:
 
-Only selected screenshots that demonstrate a meaningful test, observation, investigation, or verification result will be included in the relevant phase.
+- What I intended to test
+- What I actually performed
+- What the tools returned
+- What I discovered
+- What the evidence supports
+- What remains unverified
 
-## Project Limitations
+The individual phase READMEs provide the detailed commands, findings, and selected supporting screenshots.
 
-This was a small-scale, controlled research pilot.
+## Evidence & Reproducibility
+
+The project uses genuine laboratory evidence, including:
+
+- Screenshots of completed testing activities
+- Independent ground-truth records
+- Python generation and reproduction scripts
+- Original and modified image artifacts
+- SHA-256 integrity verification
+- Saved StegaShield API responses
+- Windows Sysmon events
+- Splunk investigation results
+- Zeek network records
+- Nginx HTTPS access logs
+- Docker deployment metadata
+
+Only screenshots that directly demonstrate a relevant action, observation, finding, or verification result will be selected for the published phase documentation.
+
+The screenshot archives collected during the pilot are source material, not automatically the final published evidence set.
+
+Original Phase 01 screenshots are still pending recovery. No missing screenshots will be substituted or represented as verified evidence.
+
+## Scope & Limitations
+
+This was a controlled, non-production research pilot.
 
 The primary validation used one synthetic clean image and one corresponding RGB-LSB-modified image.
 
-Broader evaluation would require additional independent samples, natural images, different payload sizes, and alternative embedding methods.
+The results do not establish performance across natural photographs, broader image datasets, additional embedding techniques, or different payload sizes.
 
-The experiment does not establish production readiness, native StegaShield SIEM integration, or malicious activity.
+Dataset A was identified as external reference material and was reportedly associated with the product team's training/testing workflow. It was not used to establish independent generalization.
 
-## Project Conclusion
+The experiment did not establish native StegaShield-to-Splunk integration.
 
-This investigation demonstrated the importance of establishing independent ground truth, verifying telemetry, investigating unexpected results, and preserving reproducible evidence.
+Encrypted network connection metadata was investigated separately from the application-level image analysis.
 
-The central finding was a confirmed false negative for a controlled RGB-LSB-modified image.
+A steganography classification does not independently establish malicious activity or data exfiltration.
 
-The project also reinforced the value of correlating multiple SOC telemetry sources to support defensible technical conclusions.
+## Final Conclusion
 
-The detailed methodology, screenshots, observations, and discoveries are documented separately within the eight project phases.
+The pilot demonstrated one correct clean-image classification and one missed detection of a controlled RGB-LSB modification.
+
+The project also demonstrated the importance of verifying endpoint telemetry, correlating multiple evidence sources, and preserving reproducible testing artifacts.
+
+The central lesson was that meaningful detection validation requires independent ground truth, controlled experimentation, and conclusions supported by actual evidence.
+
+For the complete technical investigations, screenshots, and discoveries, explore the individual phases above.
 
 ---
 
-**Independent Research | Detection Validation | SOC Investigation**
+**Independent Cybersecurity Research | SOC Investigation | Detection Validation**
+

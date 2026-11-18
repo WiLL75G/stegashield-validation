@@ -1,26 +1,30 @@
 
 # StegaShield Detection Validation Pilot
 
-## Investigation Notes — Analyst Handoff & Technical Review
+## Investigation Notes — SOC Analyst Technical Handoff
 
 **Project:** StegaShield Detection Validation Pilot  
-**Investigator:** William  
+**Investigation Type:** Independent Detection Validation and SOC Telemetry Correlation  
 **Environment:** Controlled SOC Home Laboratory  
-**Investigation period:** November 2026  
-**Technical review:** November 20, 2026  
-**Review audience:** Franco Garcia and technical stakeholders  
-**Investigation type:** Independent Detection Validation and SOC Telemetry Correlation  
-**Status:** Seven hands-on stages completed  
+**Investigation Period:** November 2026  
+**Status:** Completed  
+**Scope:** Seven hands-on investigation stages  
 
-**Repository:** [StegaShield Detection Validation Pilot](https://github.com/WiLL75G/stegashield-validation)
+[Back to Project Overview](README.md)
 
 ---
 
-# 1. Investigation Executive Summary
+# 1. Executive Investigation Summary
 
-I conducted an independent validation pilot to evaluate how StegaShield behaved when analyzing a known-clean image and a corresponding image containing a controlled steganographic payload.
+This document provides a detailed technical handoff of the StegaShield Detection Validation Pilot.
 
-I structured the practical investigation into seven stages:
+The investigation evaluated how StegaShield classified independently generated clean and steganographically modified images.
+
+It also examined whether the associated image-submission activity could be reconstructed using endpoint, network, and application telemetry.
+
+The objective was not simply to deploy a detection tool. The investigation focused on establishing independent ground truth, validating model responses, investigating unexpected classifications, correlating security telemetry, and verifying the integrity of retained evidence.
+
+The hands-on investigation was completed in seven stages:
 
 1. Laboratory environment and telemetry baseline
 2. Independent dataset generation
@@ -30,110 +34,130 @@ I structured the practical investigation into seven stages:
 6. SOC telemetry correlation
 7. Reproducibility and evidence integrity
 
-The project is documented in eight GitHub phases, with Phase 08 serving as the final consolidated assessment rather than an additional experiment.
+An eighth GitHub documentation phase consolidates the technical assessment without introducing additional experiments.
 
-My objective was not simply to install StegaShield. I wanted to establish independent ground truth, evaluate the detector's predictions, investigate unexpected results, correlate security telemetry, and verify the preserved evidence.
+## 1.1 Primary Detection Finding
 
-## Primary Detection Finding
+StegaShield correctly classified an independently generated clean image but incorrectly classified its corresponding RGB-LSB-modified image as clean.
 
-StegaShield correctly classified a known-clean image but incorrectly classified its corresponding RGB-LSB-modified image as clean.
-
-The modified image contained a controlled 23-byte payload:
+The modified image contained the controlled 23-byte payload:
 
 ```text
 STEGASHIELD_PILOT_SS001
 ```
 
-I subsequently recovered the exact payload from the preserved modified PNG.
+The payload was subsequently recovered directly from the preserved modified PNG.
 
-**Detection outcome: One true negative and one confirmed false negative for the controlled image pair.**
+This independently confirmed the presence of embedded information in the tested image.
 
-## Secondary SOC Finding
+**Detection disposition: One true negative and one confirmed false negative for the controlled image pair.**
 
-During the HTTPS investigation, a Sysmon Event ID 3 network connection associated with the modified-image submission recorded:
+## 1.2 Primary SOC Investigation Finding
+
+During the controlled HTTPS image submissions, a Sysmon Event ID 3 network connection associated with the modified image recorded:
 
 ```text
 Image: <unknown process>
 ProcessId: 10344
+SourcePort: 54306
 ```
 
-By correlating the process ID with Sysmon Event ID 1 in Splunk, I identified the process as `curl.exe`, launched from PowerShell.
+Correlation with Sysmon Event ID 1 in Splunk identified the process as `curl.exe`, launched from PowerShell.
 
-This demonstrated how endpoint event correlation can recover useful attribution when an individual network event contains incomplete information.
+This demonstrated the value of process creation telemetry when network connection records contain incomplete process attribution.
 
-## Overall Assessment
+## 1.3 Overall Assessment
 
-The project demonstrated a specific missed detection and a practical cross-source SOC investigation.
+The investigation demonstrated:
 
-It did not establish StegaShield's overall accuracy, production reliability, or performance against other embedding techniques.
+- Successful deployment and baseline verification.
+- Independent generation of labeled test samples.
+- One confirmed false-negative classification.
+- Consistent recorded predictions for the modified-image filename.
+- Endpoint, network, and application telemetry correlation.
+- Successful recovery of the embedded payload.
+- Passing SHA-256 verification of preserved evidence.
+
+These results apply to the tested environment and samples.
+
+They do not establish StegaShield's overall accuracy or performance against other steganographic techniques.
 
 ---
 
 # 2. Investigation Scope
 
-## Research Questions
+## 2.1 Objectives
 
-The investigation focused on these questions:
+The investigation addressed the following technical objectives:
 
-1. Could I independently establish clean and modified image ground truth?
-2. Could StegaShield operate successfully on Ubuntu ARM64?
-3. Would the model correctly classify a known-clean image?
-4. Would it detect a controlled RGB-LSB modification?
-5. How would the reported probabilities compare?
-6. Could I independently recover the hidden payload?
-7. Could I reconstruct image-submission activity through SOC telemetry?
-8. Could the preserved artifacts be verified and reproduced?
+1. Establish a working endpoint and network monitoring baseline.
+2. Generate independently labeled clean and modified image samples.
+3. Deploy and verify StegaShield on Ubuntu ARM64.
+4. Compare model predictions against independent ground truth.
+5. Investigate classification errors and probability differences.
+6. Correlate controlled HTTPS submissions using SOC telemetry.
+7. Verify artifact integrity and reproducibility.
 
-## Authorization
+## 2.2 Authorization
 
-All actions were performed within my controlled laboratory.
+All activities were performed within an authorized laboratory.
 
-The image submissions, certificate testing, endpoint monitoring, and evidence collection were authorized.
+The work included:
 
-No production systems were targeted.
+- Controlled image generation and modification.
+- Authorized API submissions.
+- Windows endpoint monitoring.
+- Linux network log inspection.
+- Temporary certificate-trust configuration.
+- Evidence collection and integrity checks.
+- Temporary artifact cleanup.
 
-No malicious exfiltration, unauthorized access, or real compromise was demonstrated.
+No unauthorized systems were targeted.
 
-## Out of Scope
+No production compromise or malicious data exfiltration was demonstrated.
 
-The pilot did not independently establish:
+## 2.3 Exclusions
 
-- Overall detector accuracy or recall
-- The model's internal architecture or training data
-- Performance against all steganography methods
-- Production deployment reliability
-- Native integration of all telemetry sources into Splunk
-- Complete forensic chain of custody
+The investigation did not independently establish:
+
+- General model accuracy or recall.
+- Production deployment reliability.
+- Detection of all steganography algorithms.
+- Internal model weights or training data.
+- Native ingestion of every telemetry source into Splunk.
+- Full visibility into encrypted HTTPS contents.
+- Complete forensic chain of custody.
 
 ---
 
-# 3. Laboratory Architecture
+# 3. Laboratory Environment
 
-The project used a Mac M2 host with separate ARM64 virtual machines.
+## 3.1 Components
 
-| Component | Role |
-|---|---|
-| Mac M2 | Laboratory host and Splunk Enterprise |
-| Windows 11 ARM64 — WIN-SOC | Controlled image submissions |
-| Ubuntu 24.04 ARM64 | StegaShield, Docker, Nginx, and Zeek |
-| Sysmon | Windows process and network events |
-| Splunk Universal Forwarder | Windows event forwarding |
-| Splunk Enterprise | Centralized Windows event investigation |
-| Zeek | Network connection metadata |
-| Nginx | HTTPS reverse proxy and request logging |
-| StegaShield | Image steganography classification |
-| Python and Pillow | Independent image generation |
+| Component | Technology | Function |
+|---|---|---|
+| Host workstation | Mac M2 | Laboratory management and Splunk Enterprise |
+| Windows endpoint | Windows 11 ARM64 — WIN-SOC | Controlled image submissions |
+| Linux server | Ubuntu 24.04 ARM64 | Detection service and network monitoring |
+| Endpoint monitoring | Sysmon | Process and network events |
+| Log forwarding | Splunk Universal Forwarder | Windows event forwarding |
+| SIEM | Splunk Enterprise | Windows event investigation |
+| Network monitoring | Zeek | Network connection metadata |
+| Application proxy | Nginx | HTTPS requests and access logs |
+| Detection engine | StegaShield | Image steganography classification |
+| Dataset tools | Python and Pillow | Image generation and verification |
+| Container runtime | Docker | StegaShield deployment |
 
-## Verified Network Addresses
+## 3.2 Verified Network Addresses
 
 | System | Address |
 |---|---|
 | WIN-SOC | 192.168.64.20 |
 | Ubuntu server | 192.168.64.19 |
-| Nginx HTTPS endpoint | 192.168.64.19:443 |
-| Local StegaShield API | 127.0.0.1:3000 |
+| HTTPS endpoint | 192.168.64.19:443 |
+| StegaShield local API | 127.0.0.1:3000 |
 
-## Traffic Flow
+## 3.3 Application Traffic Flow
 
 ```text
 Windows 11 — WIN-SOC
@@ -144,64 +168,83 @@ Windows 11 — WIN-SOC
 Ubuntu — Nginx
 192.168.64.19
         |
-        | HTTP reverse proxy
+        | Local HTTP reverse proxy
         v
 StegaShield Docker API
 127.0.0.1:3000
 ```
 
-Windows Sysmon events were forwarded separately to Splunk on macOS.
+Windows Sysmon events were forwarded to Splunk Enterprise on macOS.
 
-Zeek recorded network connection activity on Ubuntu.
+Zeek independently recorded network connection activity on Ubuntu.
 
-Nginx recorded HTTP application requests.
+Nginx recorded application requests.
 
-These sources were investigated together, but the experiment did not establish native centralization of all Zeek and Nginx records into Splunk.
+The telemetry sources were correlated analytically. The investigation did not establish native centralization of all specific Zeek and Nginx records into Splunk.
 
 ---
 
-# 4. Stage 1 — Laboratory Preparation & Telemetry Baseline
+# 4. Stage 1 — Laboratory Preparation and Telemetry Baseline
 
-[View Phase 01](phase-01-environment-baseline/README.md)
+**Supporting documentation:** [Phase 01 — Environment Baseline](phase-01-environment-baseline/README.md)
 
-## Objective
+## 4.1 Objective
 
-Before testing StegaShield, I wanted to verify that my SOC laboratory could reliably capture the endpoint and network activity required for the investigation.
+Verify that the laboratory monitoring environment could collect the endpoint and network activity required for subsequent testing.
 
-## What I Did
+## 4.2 Initial Environment
 
-I examined:
+The Windows endpoint used Sysmon for event generation and the Splunk Universal Forwarder for centralized event collection.
 
-- Windows Sysmon installation and configuration
-- Sysmon event generation
-- Splunk Universal Forwarder permissions
-- Windows event ingestion into Splunk
-- Ubuntu Zeek network monitoring
-- Relevant laboratory connectivity and service checks
+Ubuntu used Zeek for network monitoring.
 
-## Initial Problem
+Splunk Enterprise ran on the Mac host.
+
+## 4.3 Initial Observation
 
 Sysmon Event ID 3 was not appearing as expected.
 
-Event ID 3 is used to record network connection activity when enabled and successfully collected.
+Event ID 3 records network connection activity when enabled and successfully collected.
 
-I investigated the configuration, relevant event rules, event channel, service behavior, and supporting driver information.
+The absence of expected events created a visibility gap.
 
-I updated the collection configuration to include the required Event IDs 1, 3, and 5.
+## 4.4 Investigation
 
-## Second Problem — Forwarder Access
+The troubleshooting process included inspection of:
 
-The Splunk Universal Forwarder encountered an access issue while reading the Sysmon Operational channel.
+- Sysmon installation and service state.
+- Sysmon configuration.
+- Relevant event collection rules.
+- Sysmon driver behavior.
+- Windows event channels.
+- Supporting collection errors.
+- Splunk forwarding configuration.
 
-I investigated the service permissions, updated the necessary Event Log Readers membership, and restarted the forwarder.
+The Sysmon configuration was updated to include the required event types.
 
-## Verified Result
+These included:
 
-After remediation, I verified that Sysmon Event ID 3 was generated locally and that relevant events appeared in Splunk.
+- Event ID 1 — Process creation.
+- Event ID 3 — Network connection.
+- Event ID 5 — Process termination.
 
-A recorded 30-minute Splunk search returned:
+## 4.5 Additional Forwarding Issue
 
-| Event ID | Description | Events |
+The Splunk Universal Forwarder encountered an access problem reading the Sysmon Operational event channel.
+
+The investigation included reviewing service permissions and event-channel access.
+
+The relevant Event Log Readers membership was updated.
+
+The forwarder was restarted.
+
+## 4.6 Verification
+
+After the changes, Sysmon Event ID 3 was verified locally and in Splunk.
+
+A recorded 30-minute search returned:
+
+| Event ID | Description | Event Count |
 |---|---|---:|
 | 1 | Process creation | 215 |
 | 3 | Network connection | 52 |
@@ -209,59 +252,67 @@ A recorded 30-minute Splunk search returned:
 | 16 | Configuration state change | 1 |
 | **Total** | | **485** |
 
-These counts reflect one 30-minute search window, not lifetime monitoring totals.
+These counts apply only to the observed 30-minute search window.
 
-## Zeek Verification
+They are not lifetime event totals or proof of general monitoring accuracy.
 
-I also confirmed standalone Zeek monitoring on Ubuntu.
+## 4.7 Zeek Baseline
 
-The evidence included network connection records and controlled HTTP activity.
+Zeek was verified in standalone operation on Ubuntu.
 
-An HTTP test returned `204 No Content`.
+The available evidence included network connection records and controlled HTTP activity.
 
-This supported the observed monitoring capability but did not establish decrypted HTTPS inspection or complete visibility into every virtual-machine connection.
+An HTTP request returned:
 
-## Finding S1-F01
+```text
+204 No Content
+```
 
-**Observation:** Expected Sysmon network telemetry was initially missing.
+This supported the observed HTTP monitoring functionality.
 
-**Investigation:** Reviewed collection rules, event generation, and forwarding.
+It did not establish visibility into every virtual-machine network path or decrypted HTTPS contents.
 
-**Remediation:** Updated relevant settings and forwarder access.
+## 4.8 Finding S1-F01 — Missing Network Telemetry
 
-**Disposition:** Event ID 3 subsequently verified in Splunk.
+**Observation:** Expected Sysmon Event ID 3 records were initially absent.
 
-**Limitation:** A single definitive root cause for the initial absence of local Event ID 3 records was not established.
+**Investigation:** Reviewed configuration, event generation, and supporting collection behavior.
 
-## Analyst Takeaway
+**Remediation:** Updated event rules and verified collection.
 
-A monitoring tool being installed or enabled does not guarantee that the required events are being collected.
+**Disposition:** Event ID 3 subsequently appeared locally and in Splunk.
 
-I verified the telemetry before relying on it.
+**Limitation:** A single definitive root cause for the initial local event absence was not established.
 
-### How I Explain This to Franco
+## 4.9 Finding S1-F02 — Event Channel Access
 
-"Before testing StegaShield, I checked whether my monitoring environment was actually recording the events I needed. I discovered that Sysmon network events were missing, investigated the problem, and verified them in Splunk before proceeding."
+**Observation:** The forwarding service encountered a Sysmon Operational channel access problem.
+
+**Remediation:** Updated relevant Event Log Readers membership and restarted the forwarder.
+
+**Disposition:** Required Windows telemetry subsequently became searchable in Splunk.
+
+## 4.10 Analyst Assessment
+
+The laboratory monitoring baseline was suitable for the subsequent controlled investigation after the required events were verified.
+
+The main operational lesson was that monitoring configuration must be validated through actual event generation and collection.
 
 ---
 
 # 5. Stage 2 — Independent Dataset Generation
 
-[View Phase 02](phase-02-independent-dataset/README.md)
+**Supporting documentation:** [Phase 02 — Independent Dataset](phase-02-independent-dataset/README.md)
 
-## Objective
+## 5.1 Objective
 
-Create independently labeled clean and modified images so that StegaShield predictions could be evaluated against known ground truth.
+Create independently labeled image samples without relying on the detector's predictions to establish ground truth.
 
-## Why Independent Ground Truth Matters
+## 5.2 Clean Reference
 
-If I submitted an unknown image and the model labeled it clean, I would not necessarily know whether that prediction was correct.
+The clean reference was generated using Python and Pillow.
 
-I therefore generated the samples myself.
-
-## Sample A — Clean Reference
-
-The clean image was created using Python and Pillow.
+### Recorded Properties
 
 | Property | Value |
 |---|---|
@@ -274,13 +325,17 @@ The clean image was created using Python and Pillow.
 | Random seed | 20261007 |
 | Embedded payload | None |
 
-The image consisted of pseudorandom RGB pixels rather than natural photographic content.
+The sample consisted of pseudorandom RGB pixel values.
 
-The fixed seed supported deterministic reproduction under the tested generation procedure.
+It was not a natural photographic image.
 
-## Sample B — Modified Reference
+The generation procedure used a fixed random seed to support deterministic reproduction.
 
-I created a second image from the clean sample using RGB least-significant-bit replacement.
+## 5.3 Modified Reference
+
+The modified image was derived from the clean sample using RGB least-significant-bit replacement.
+
+### Recorded Properties
 
 | Property | Value |
 |---|---|
@@ -290,44 +345,59 @@ I created a second image from the clean sample using RGB least-significant-bit r
 | Parent | SS-001-CLEAN.png |
 | Embedding method | RGB-LSB |
 | Payload preparation | RAW |
-| Payload size | 23 bytes |
+| Payload length | 23 bytes |
 
-## Embedded Payload
+## 5.4 Embedded Payload
 
 ```text
 STEGASHIELD_PILOT_SS001
 ```
 
-The embedding method used:
+The embedding procedure used:
 
-- 32-bit payload-length header
-- 184 payload bits
-- 216 total embedded bit positions
+- A 32-bit payload-length header.
+- 184 payload bits.
+- 216 total embedded bit positions.
 
-The relevant Python operation was:
+The central Python operation was:
 
 ```python
 channels[index] = (channels[index] & 254) | int(bit)
 ```
 
-This clears the least significant bit of the selected RGB channel byte and replaces it with the required payload bit.
+This operation clears the least significant bit of a selected RGB channel byte and replaces it with the intended bit.
 
-The method modified image channel values rather than appending text to the PNG file.
+The technique modified image-channel values rather than appending text to the end of the PNG.
 
-## Ground-Truth Manifest
+## 5.5 Ground-Truth Manifest
 
-I preserved the sample labels, relationships, dimensions, embedding parameters, payload size, and SHA-256 hashes in a CSV manifest.
+The ground-truth CSV recorded:
 
-The initial CSV structure required correction.
+- Sample identifiers.
+- Ground-truth labels.
+- Parent-child image relationship.
+- File paths.
+- Dimensions.
+- Image format and mode.
+- Embedding method.
+- Payload preparation.
+- Payload size.
+- SHA-256 fingerprints.
 
-After fixing the structure, validation confirmed:
+The initial manifest structure was malformed and did not parse correctly.
 
-- 12 columns
-- 2 records
-- Correct sample identifiers
-- Successful original-image hash checks
+After correction, the validation output confirmed:
 
-## Recorded SHA-256 Fingerprints
+```text
+Columns: 12
+Records: 2
+```
+
+Both expected sample identifiers were present.
+
+The original-image hash checks passed.
+
+## 5.6 Original Image Fingerprints
 
 ### Clean Image
 
@@ -341,47 +411,49 @@ d6fc09cec7ccd77d509457f610ab1d3f73a9e68dc3bbc146cb383e5255f34d5a
 a13757e106766d7d4960c151158c56131245646ef4cb50f28208649d4db97570
 ```
 
-## Finding S2-F01
+## 5.7 Evidence Preservation
 
-**Observation:** Independently generated clean and modified PNG samples were preserved.
+The original images were preserved separately.
 
-**Ground truth:** One CLEAN and one MODIFIED.
+Reproduction scripts wrote output into distinct evidence paths.
 
-**Verification:** Original artifacts matched their recorded fingerprints.
+Exclusive file creation was used to reduce the risk of accidentally overwriting preserved artifacts.
 
-**Disposition:** Dataset suitable for the planned controlled test.
+## 5.8 Finding S2-F01 — Independent Ground Truth
 
-## Limitations
+**Observation:** One clean and one RGB-LSB-modified sample were generated.
 
-The dataset was small and synthetic.
+**Verification:** Ground-truth manifest and recorded image fingerprints.
 
-It did not represent natural photographs, other payload sizes, or multiple steganography algorithms.
+**Disposition:** Samples suitable for the planned controlled validation.
 
-### How I Explain This to Franco
+## 5.9 Limitations
 
-"I generated the clean image myself and embedded a controlled 23-byte message into a modified version. Because I already knew which image contained hidden information, I could independently check whether StegaShield's classification was correct."
+The dataset contained only one synthetic clean image and one modified derivative.
+
+It did not represent natural photographs or multiple embedding methods.
+
+No representative benchmark was established.
 
 ---
 
-# 6. Stage 3 — StegaShield Deployment & Clean Baseline
+# 6. Stage 3 — StegaShield Deployment and Clean Baseline
 
-[View Phase 03](phase-03-deployment-baseline/README.md)
+**Supporting documentation:** [Phase 03 — Deployment Baseline](phase-03-deployment-baseline/README.md)
 
-## Objective
+## 6.1 Objective
 
-Deploy StegaShield on Ubuntu ARM64, verify application readiness, and establish a known-clean image baseline.
+Deploy StegaShield on Ubuntu ARM64, confirm application readiness, and establish a known-clean classification baseline.
 
-## Docker Deployment
+## 6.2 Docker Deployment
 
-StegaShield was deployed using Docker Compose.
-
-### Image
+The recorded image reference was:
 
 ```text
 5iprojects/stegashield:latest
 ```
 
-### Recorded Configuration
+### Relevant Configuration
 
 | Setting | Value |
 |---|---|
@@ -389,34 +461,40 @@ StegaShield was deployed using Docker Compose.
 | Platform | linux/arm64 |
 | Host binding | 127.0.0.1:3000 |
 | Container port | 3000 |
-| Maximum upload | 10,485,760 bytes |
+| Maximum upload size | 10,485,760 bytes |
 | Maximum image dimension | 4,000 |
 | Inference timeout | 60 seconds |
 | Restart policy | no |
 
-The configuration used a required license token supplied through the local environment.
+The deployment required a license token supplied through the local environment.
 
-The token is excluded from the public documentation.
+The token is not included in the public documentation.
 
-## Readiness Verification
+## 6.3 Application Readiness
 
-I inspected the running container and tested:
+The local readiness endpoint was:
 
 ```text
 http://127.0.0.1:3000/ready
 ```
 
-The API returned HTTP 200.
+The endpoint returned:
 
-The container reported a healthy state.
+```text
+HTTP 200
+```
 
-This established service availability for the controlled test.
+The container reported a healthy running state.
 
-## Clean Image Submission
+This verified application availability for the controlled test.
 
-I submitted the independently generated clean reference.
+It did not establish the model's detection accuracy.
 
-The saved result was:
+## 6.4 Clean Reference Analysis
+
+The known-clean image was submitted to the detection engine.
+
+The preserved response was:
 
 ```json
 {
@@ -428,77 +506,86 @@ The saved result was:
 }
 ```
 
-## Interpretation
+### Evaluation
 
-**Ground truth:** CLEAN
+| Field | Value |
+|---|---|
+| Ground truth | CLEAN |
+| Model prediction | clean |
+| Probability | 0.20640554 |
+| Outcome | True Negative |
 
-**Prediction:** clean
+The clean reference was classified correctly.
 
-**Result:** True Negative
+## 6.5 HTTPS Configuration
 
-The detector correctly classified the tested clean reference.
-
-## HTTPS Preparation
-
-I configured Nginx as an HTTPS reverse proxy for Windows client testing.
+Nginx was configured as an HTTPS reverse proxy.
 
 The configuration included:
 
-- TCP port 443
-- TLS 1.2 and TLS 1.3
-- A self-signed laboratory certificate
-- IP allowlisting for WIN-SOC
-- Reverse proxying to 127.0.0.1:3000
-- Nginx access and error logs
+- TCP port 443.
+- TLS 1.2 and TLS 1.3.
+- A self-signed laboratory certificate.
+- Client IP allowlisting.
+- Reverse proxying to the local StegaShield API.
+- Separate application access and error logs.
 
-The initial Windows connection failed certificate validation with:
+The initial Windows connection failed certificate validation.
+
+The observed error included:
 
 ```text
 SEC_E_UNTRUSTED_ROOT
 ```
 
-The laboratory certificate-trust issue was addressed during the later HTTPS investigation.
+The certificate-trust issue was addressed during the later controlled HTTPS workflow.
 
-## Finding S3-F01
+## 6.6 Finding S3-F01 — Application Readiness
 
 **Observation:** Container healthy and readiness endpoint returned HTTP 200.
 
-**Disposition:** Deployment readiness verified.
+**Disposition:** Verified.
 
-## Finding S3-F02
+## 6.7 Finding S3-F02 — Clean Baseline
 
-**Observation:** Clean reference classified correctly.
+**Observation:** Known-clean sample classified as clean.
 
-**Disposition:** True Negative for the tested sample.
+**Disposition:** True Negative for the tested image.
 
-## Limitation
+## 6.8 Limitations
 
-Successful application startup and HTTP responses do not establish overall detection accuracy.
+A healthy container and successful API response do not establish overall detection performance.
 
-### How I Explain This to Franco
-
-"I deployed StegaShield using Docker, checked that the API was ready, and submitted my clean reference. It was classified correctly. That gave me a baseline before I tested the modified sample."
+The clean baseline represented one synthetic sample.
 
 ---
 
 # 7. Stage 4 — RGB-LSB Detection Validation
 
-[View Phase 04](phase-04-lsb-detection-validation/README.md)
+**Supporting documentation:** [Phase 04 — RGB-LSB Detection](phase-04-lsb-detection-validation/README.md)
 
-## Objective
+## 7.1 Objective
 
-Evaluate whether StegaShield would identify the independently prepared RGB-LSB-modified image.
+Determine whether StegaShield identified the independently generated RGB-LSB-modified image.
 
-## Modified Sample
+## 7.2 Test Sample
 
 ```text
 Filename: SS-001-LSB-RAW.png
 Ground truth: MODIFIED
-Payload: STEGASHIELD_PILOT_SS001
+Embedding method: RGB-LSB
 Payload length: 23 bytes
 ```
 
-## Saved StegaShield Response
+The embedded message was:
+
+```text
+STEGASHIELD_PILOT_SS001
+```
+
+## 7.3 Recorded Analysis
+
+The saved StegaShield response was:
 
 ```json
 {
@@ -510,70 +597,70 @@ Payload length: 23 bytes
 }
 ```
 
-## Expected Versus Observed
+## 7.4 Expected Versus Observed
 
-| Property | Value |
+| Field | Value |
 |---|---|
-| Actual condition | MODIFIED |
-| Model prediction | clean |
+| Ground truth | MODIFIED |
+| Prediction | clean |
 | Probability | 0.20640557 |
-| Outcome | False Negative |
+| Classification | False Negative |
 
-StegaShield processed the image but returned a classification that did not match its independently established ground truth.
+The application processed the modified image and returned a valid response.
 
-## Finding S4-F01 — Confirmed False Negative
+However, the predicted label did not match the independently established ground truth.
 
-**Observation:** RGB-LSB-modified image classified as clean.
+## 7.5 Finding S4-F01 — RGB-LSB False Negative
+
+**Observation:** Modified PNG classified as clean.
 
 **Supporting evidence:**
 
-- Independent embedding script
-- Ground-truth manifest
-- Preserved modified PNG
-- Saved API analysis
-- Subsequent payload recovery
-- SHA-256 verification
+- Independent embedding methodology.
+- Ground-truth manifest.
+- Preserved modified PNG.
+- StegaShield analysis JSON.
+- Successful payload recovery.
+- SHA-256 verification.
 
-**Disposition:** False Negative for the tested sample.
+**Disposition:** Confirmed False Negative for the tested sample.
 
-## Interpretation
+## 7.6 Interpretation
 
-The detector missed this specific controlled modification.
+The tested detector missed this particular controlled RGB-LSB modification.
 
-It does not follow that every RGB-LSB image would evade detection.
+The result does not demonstrate that all RGB-LSB images evade detection.
 
-### How I Explain This to Franco
-
-"This was my biggest discovery. I submitted an image that I knew contained hidden information, but StegaShield classified it as clean. I later recovered the exact hidden message from the preserved image, which strengthened the evidence supporting the false negative."
+The internal cause of the incorrect classification was not established.
 
 ---
 
 # 8. Stage 5 — Detection Error Analysis
 
-[View Phase 05](phase-05-error-analysis/README.md)
+**Supporting documentation:** [Phase 05 — Error Analysis](phase-05-error-analysis/README.md)
 
-## Objective
+## 8.1 Objective
 
-Analyze the recorded classifications and probabilities without overstating what the limited experiment could demonstrate.
+Compare the recorded model responses and determine what could be concluded from the observed classification error.
 
-## Comparison
+## 8.2 Prediction Comparison
 
 | Sample | Ground Truth | Prediction | Probability |
 |---|---|---|---|
 | SS-001-CLEAN.png | CLEAN | clean | 0.20640554 |
 | SS-001-LSB-RAW.png | MODIFIED | clean | 0.20640557 |
 
-## Probability Difference
+The reported probability difference was:
 
 ```text
 0.20640557 - 0.20640554 = 0.00000003
 ```
 
-The detector reported extremely similar probabilities for the two related samples.
+The two samples received almost identical reported probabilities.
 
-## Earlier Modified-Image Analysis
+## 8.3 Repeated Modified-Image Analysis
 
-A second saved analysis record contained:
+An earlier saved response contained:
 
 ```json
 {
@@ -585,75 +672,79 @@ A second saved analysis record contained:
 }
 ```
 
-Both modified-image records reported:
+The two modified-image records contained:
 
-```text
-Prediction: clean
-Probability: 0.20640557
-```
+| Record | Prediction | Probability |
+|---|---|---|
+| Earlier analysis | clean | 0.20640557 |
+| Later analysis | clean | 0.20640557 |
 
-The records contained different analysis IDs and timestamps.
+They had different analysis IDs and timestamps.
 
-## Observed Classification Counts
+Both reported the same label and probability.
+
+## 8.4 Interpretation
+
+The recorded responses support consistent reported predictions across the two saved modified-image analyses.
+
+However, the JSON responses did not include input-image SHA-256 fields.
+
+Matching filenames and probabilities alone do not independently prove identical uploaded bytes across both submissions.
+
+## 8.5 Observed Classification Counts
 
 | Actual Condition | Predicted Clean | Predicted Modified |
 |---|---:|---:|
 | CLEAN | 1 | 0 |
 | MODIFIED | 1 | 0 |
 
-These counts apply only to the controlled sample pair.
+These counts describe only the controlled sample pair.
 
-## Hypotheses Considered
+They must not be used to make population-level accuracy or false-negative-rate claims.
 
-The similar scores raised possible questions about:
+## 8.6 Hypotheses and Unresolved Questions
 
-- Sensitivity to the embedding method
-- Effects of the small payload
-- Effects of synthetic carrier-image content
-- Model preprocessing
-- Training-data representation
+The observed score similarity raised possible questions about:
 
-These were possible research directions, not confirmed root causes.
+- Embedding-method sensitivity.
+- Small payload size.
+- Synthetic carrier-image content.
+- Application preprocessing.
+- Model training representation.
 
-## Finding S5-F01
+These are hypotheses and possible research directions.
 
-**Observation:** Nearly identical scores for the clean and modified samples.
+The experiment did not establish any of them as the root cause.
+
+## 8.7 Finding S5-F01 — Minimal Score Separation
+
+**Observation:** Difference of 0.00000003.
 
 **Disposition:** Verified observation.
 
 **Root cause:** Not established.
 
-## Finding S5-F02
+## 8.8 Finding S5-F02 — Repeated Recorded Predictions
 
-**Observation:** Two saved modified-image analyses returned matching labels and probabilities.
+**Observation:** Two modified-image analysis records returned the same label and probability.
 
-**Disposition:** Consistent recorded predictions.
+**Disposition:** Consistent recorded outputs.
 
-**Limitation:** The saved responses did not include input-image SHA-256 fields proving byte-identical submissions.
-
-## Analyst Conclusion
-
-The experiment identified one false negative.
-
-It did not establish representative model accuracy, recall, or a general false-negative rate.
-
-### How I Explain This to Franco
-
-"I compared the model probabilities and found that the difference was only 0.00000003. The repeated saved analyses returned the same prediction. However, I couldn't determine why the model missed the modification, so I documented that as an unresolved question rather than inventing a cause."
+**Limitation:** Exact uploaded input-byte identity not independently established by the saved JSON.
 
 ---
 
 # 9. Stage 6 — SOC Telemetry Correlation
 
-[View Phase 06](phase-06-soc-telemetry-correlation/README.md)
+**Supporting documentation:** [Phase 06 — SOC Telemetry Correlation](phase-06-soc-telemetry-correlation/README.md)
 
-## Objective
+## 9.1 Objective
 
-Investigate authorized image submissions through endpoint, network, and application telemetry.
+Reconstruct authorized HTTPS image submissions using endpoint, network, and application evidence.
 
-## Controlled HTTPS Testing
+## 9.2 Controlled Activity
 
-The Windows endpoint submitted both samples to:
+The Windows endpoint submitted both test images to:
 
 ```text
 https://192.168.64.19/api/analyze
@@ -664,60 +755,68 @@ The submissions used PowerShell and `curl.exe`.
 ### Network Context
 
 ```text
-Client: 192.168.64.20
-Server: 192.168.64.19
+Source: 192.168.64.20
+Destination: 192.168.64.19
 Destination port: 443/TCP
 ```
 
-## 9.1 Nginx Investigation
+## 9.3 Nginx Investigation
 
-I inspected:
+The configured access log was:
 
 ```text
 /var/log/nginx/stegashield-access.log
 ```
 
-Nginx recorded two successful requests.
+The relevant records showed successful requests.
 
 | Client | Method | Endpoint | Status |
 |---|---|---|---|
 | WIN-SOC | POST | /api/analyze | 200 |
 | WIN-SOC | POST | /api/analyze | 200 |
 
+### Observation
+
+Nginx recorded the expected application requests.
+
 ### Interpretation
 
-Both requests reached the application reverse proxy and received successful HTTP responses.
+The requests reached the reverse proxy and received HTTP 200 responses.
 
-The Nginx log alone did not identify the Windows executable or reveal the uploaded image contents.
+### Limitation
 
-## 9.2 Zeek Investigation
+Nginx access records did not independently identify the Windows executable or image contents.
 
-I inspected the archived Zeek connection logs.
+## 9.4 Zeek Network Investigation
 
-The relevant connections were:
+Archived Zeek connection logs recorded corresponding encrypted connections.
 
-| Sample | Source IP | Source Port | Destination |
+| Submission | Source IP | Source Port | Destination |
 |---|---|---:|---|
 | Clean | 192.168.64.20 | 54301 | 192.168.64.19:443 |
 | Modified | 192.168.64.20 | 54306 | 192.168.64.19:443 |
 
-The records reported SSL connections with `SF` state values.
+The records identified SSL connections and included `SF` connection states.
+
+### Observation
+
+The relevant source and destination addresses and ports were present.
 
 ### Interpretation
 
-The source ports helped correlate network activity with Windows endpoint records.
+Source ports `54301` and `54306` provided useful correlation identifiers.
 
-Zeek observed encrypted connection metadata.
+### Limitation
 
-The experiment did not demonstrate decryption of HTTPS traffic or network-level extraction of the embedded payload.
+Zeek recorded encrypted connection metadata.
 
-## 9.3 Windows Sysmon Event ID 3
+The investigation did not demonstrate decryption of the HTTPS payload.
 
-I examined the Windows network activity in Splunk.
+## 9.5 Windows Sysmon Investigation
+
+Windows Sysmon Event ID 3 captured corresponding network activity.
 
 ### Clean Submission
-
-The relevant record contained:
 
 ```text
 SourcePort: 54301
@@ -728,8 +827,6 @@ Image: curl.exe
 
 ### Modified Submission
 
-The corresponding event contained:
-
 ```text
 SourcePort: 54306
 DestinationIp: 192.168.64.19
@@ -738,18 +835,18 @@ ProcessId: 10344
 Image: <unknown process>
 ```
 
-The modified-image record contained network metadata but lacked a resolved process image.
+The modified-image event contained useful network information but lacked a resolved process image.
 
-## 9.4 Splunk Investigation Queries
+## 9.6 Splunk Investigation
 
-The Windows events were indexed under:
+The relevant Windows events were indexed under:
 
 ```text
 index=windows
 host=WIN-SOC
 ```
 
-### Query 1 — Clean Connection
+### Query 1 — Clean Image Network Connection
 
 ```spl
 index=windows host="WIN-SOC" EventCode=3
@@ -760,9 +857,9 @@ DestinationPort=443
 | table _time host EventCode Image ProcessId SourceIp SourcePort DestinationIp DestinationPort
 ```
 
-This search focused on the clean-image connection.
+The result identified the clean-image connection and its originating executable.
 
-### Query 2 — Modified Connection
+### Query 2 — Modified Image Network Connection
 
 ```spl
 index=windows host="WIN-SOC" EventCode=3
@@ -773,16 +870,18 @@ DestinationPort=443
 | table _time host EventCode Image ProcessId SourceIp SourcePort DestinationIp DestinationPort
 ```
 
-The result exposed the unknown process image and PID 10344.
+The result identified the corresponding network event containing an unknown process image.
 
-### Query 3 — Process Creation Pivot
+The event retained process ID `10344`.
+
+### Query 3 — Process Creation Investigation
 
 ```spl
 index=windows host="WIN-SOC" EventCode=1 ProcessId=10344
 | table _time ProcessGuid ProcessId Image ParentImage CommandLine
 ```
 
-The result identified:
+The process creation record identified:
 
 ```text
 ProcessId: 10344
@@ -790,102 +889,104 @@ Image: C:\Windows\System32\curl.exe
 ParentImage: C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe
 ```
 
-The command line referenced the modified PNG and StegaShield HTTPS endpoint.
+The command line referenced the modified image and StegaShield HTTPS API endpoint.
 
-## 9.5 Correlation Reasoning
+## 9.7 Correlation Methodology
 
-The investigation followed this chain:
+The evidence was correlated as follows:
 
-1. Zeek recorded an SSL connection from source port 54306.
+1. Zeek recorded the modified-image HTTPS connection using source port 54306.
 2. Sysmon Event ID 3 recorded the corresponding Windows network connection.
 3. The network event contained PID 10344 but an unknown process image.
-4. I searched Sysmon Event ID 1 for the same PID.
-5. The process creation record identified `curl.exe`.
-6. The parent process was PowerShell.
-7. The command line referenced the modified image and StegaShield API.
+4. Sysmon Event ID 1 was searched using the recorded PID.
+5. Event ID 1 identified `curl.exe`.
+6. The parent executable was PowerShell.
+7. The process command line referenced the modified PNG and API endpoint.
 
-The matching process ID, endpoint information, timing, and command-line context supported attribution.
+The process ID, connection metadata, timing, and command-line context supported attribution.
 
-### Correlation Caveats
+## 9.8 Correlation Caveats
 
 Process IDs can be reused.
 
-The network event did not provide a directly matching usable process GUID.
+Therefore, PID matching alone is insufficient.
 
-Some timestamps were represented differently across the tools.
+The available network event did not provide a directly matching usable process GUID.
 
-Complete cross-system time synchronization was not independently established.
+The investigation used supporting host, timing, and command-line context.
 
-## Findings
+Some timestamp representations differed across monitoring systems.
 
-### S6-F01 — Nginx Request Logging
+Complete clock synchronization was not independently established.
 
-**Observation:** Successful POST requests recorded.
+## 9.9 Findings
 
-**Disposition:** Verified.
+### S6-F01 — Application Request Visibility
 
-### S6-F02 — Zeek Network Visibility
-
-**Observation:** Corresponding SSL connections identified.
+**Observation:** Nginx recorded successful image-analysis POST requests.
 
 **Disposition:** Verified.
 
-### S6-F03 — Incomplete Process Attribution
+### S6-F02 — Network Connection Visibility
 
-**Observation:** Sysmon Event ID 3 showed `<unknown process>`.
+**Observation:** Zeek recorded corresponding encrypted network connections.
+
+**Disposition:** Verified.
+
+### S6-F03 — Incomplete Process Image
+
+**Observation:** Sysmon Event ID 3 recorded `<unknown process>` for the modified submission.
 
 **Disposition:** Investigation required.
 
-### S6-F04 — Process Creation Correlation
+### S6-F04 — Process Attribution
 
-**Observation:** Sysmon Event ID 1 identified PID 10344 as `curl.exe` launched by PowerShell.
+**Observation:** Event ID 1 identified PID 10344 as `curl.exe`, launched from PowerShell.
 
-**Disposition:** Attribution supported by correlated evidence.
+**Disposition:** Attribution supported by correlated endpoint evidence.
 
-## SOC Conclusion
+## 9.10 SOC Assessment
 
-The activity could be reconstructed using complementary endpoint, network, and application records.
+The investigation demonstrated how authorized image-submission activity could be reconstructed using complementary telemetry.
 
-This was authorized laboratory activity.
+It did not demonstrate malicious activity, unauthorized access, or exfiltration.
 
-The investigation did not demonstrate malicious exfiltration or a production security incident.
-
-### How I Explain This to Franco
-
-"I investigated the image submissions using Nginx, Zeek, Sysmon, and Splunk. One Sysmon network event showed an unknown process, but the PID was available. I pivoted to Event ID 1 and identified curl.exe launched from PowerShell. That demonstrated how I could recover missing context by correlating multiple records."
+A controlled steganographic payload does not independently establish malicious intent.
 
 ---
 
-# 10. Stage 7 — Reproducibility & Evidence Integrity
+# 10. Stage 7 — Reproducibility and Evidence Integrity
 
-[View Phase 07](phase-07-reproducibility-integrity/README.md)
+**Supporting documentation:** [Phase 07 — Reproducibility](phase-07-reproducibility-integrity/README.md)
 
-## Objective
+## 10.1 Objective
 
-Verify that the original dataset, reproduced samples, saved analysis responses, deployment identity, and recovered payload were supported by preserved evidence.
+Verify the retained image artifacts, saved analysis results, reproduction methodology, Docker deployment identity, payload recovery, and temporary artifact cleanup.
 
-## 10.1 Image SHA-256 Verification
+## 10.2 Image Integrity
 
-I executed:
+The recorded verification command was:
 
 ```bash
 sha256sum -c ~/stegashield-pilot/dataset-b-independent/evidence/SS-001-reproducibility.sha256
 ```
 
-The four checked artifacts were:
+The checks covered:
 
-- Original clean PNG
-- Reproduced clean PNG
-- Original modified PNG
-- Reproduced modified PNG
+- Original clean image.
+- Reproduced clean image.
+- Original RGB-LSB image.
+- Reproduced RGB-LSB image.
 
 All four returned `OK`.
 
-**Result: 4/4 PASS**
+**Result: 4/4 PASS.**
 
-## 10.2 Analysis JSON Verification
+These checks established agreement with the recorded checksum manifest.
 
-I also checked three saved analysis artifacts:
+## 10.3 Analysis JSON Integrity
+
+Three saved analysis records were verified:
 
 ```text
 SS-001-CLEAN-analysis.json
@@ -895,15 +996,15 @@ SS-001-LSB-RAW-earlier-analysis.json
 
 All three matched their recorded SHA-256 fingerprints.
 
-**Result: 3/3 PASS**
+**Result: 3/3 PASS.**
 
-These checks support integrity relative to the recorded manifests.
+### Limitation
 
-They do not independently establish original creation times or a complete forensic chain of custody.
+Checksum verification does not independently establish original file creation times or a complete forensic chain of custody.
 
-## 10.3 Script Review
+## 10.4 Reproduction Script Review
 
-The preserved Python scripts included:
+The preserved scripts included:
 
 ```text
 generate_clean.py
@@ -912,21 +1013,13 @@ reproduce_clean.py
 reproduce_lsb.py
 ```
 
-The reproduction scripts wrote their output to separate paths.
+The reproduction scripts preserved the documented generation and embedding procedures.
 
-Exclusive file creation helped protect existing outputs from accidental overwriting.
+Outputs were written to separate paths.
 
-The reviewed methodology preserved:
+Exclusive file creation was used to reduce the risk of overwriting existing output files.
 
-- 512 × 512 RGB image dimensions
-- Fixed clean-image generation seed
-- 23-byte embedded payload
-- RGB-LSB embedding
-- 32-bit payload-length header
-
-## 10.4 Docker Image Identity
-
-I inspected the locally installed image and running container.
+## 10.5 Docker Image Identity
 
 The recorded image reference was:
 
@@ -934,13 +1027,13 @@ The recorded image reference was:
 5iprojects/stegashield:latest
 ```
 
-The exact inspected image ID was:
+The inspected image ID was:
 
 ```text
 sha256:64a6a378550f479c572c689bdb0af284cd81971e591a72077a6e74f7a97ea0e5
 ```
 
-The reported architecture was:
+The architecture was:
 
 ```text
 arm64
@@ -948,19 +1041,15 @@ arm64
 
 The running container referenced the same image ID.
 
-This improved deployment traceability compared with relying only on the mutable `latest` tag.
+This improved traceability beyond the mutable `latest` tag.
 
-## 10.5 Independent Payload Recovery
+It did not establish the model's internal weights or training data.
 
-I used a read-only Python extraction method to recover the RGB-LSB payload from the preserved modified image.
+## 10.6 Independent Payload Recovery
 
-The procedure:
+A read-only Python extraction was performed against the preserved modified PNG.
 
-1. Read the PNG's RGB channel bytes.
-2. Extract the least significant bits.
-3. Decode the first 32 bits as the payload length.
-4. Extract the corresponding payload bits.
-5. Reconstruct the message bytes.
+The procedure decoded the 32-bit length header and reconstructed the payload from the RGB least-significant bits.
 
 The recorded output was:
 
@@ -969,31 +1058,31 @@ Payload length: 23
 Recovered payload: STEGASHIELD_PILOT_SS001
 ```
 
-The recovered payload matched the original message.
+The recovered payload matched the original intended message.
 
 ### Interpretation
 
-This provided independent confirmation that the modified image contained the expected hidden information.
+The preserved modified image genuinely contained the documented embedded information.
 
-It strengthened the false-negative finding.
+This independently strengthened the ground-truth evidence for the false-negative finding.
 
-The extraction relied on knowledge of the embedding format.
+## 10.7 Temporary Artifact Cleanup
 
-## 10.6 Temporary Artifact Cleanup
+Temporary image and certificate copies had been used during controlled HTTPS testing.
 
-Temporary image copies and a certificate copy had been used during HTTPS testing.
+The initial Ubuntu cleanup attempt did not remove every temporary file.
 
-The initial Ubuntu cleanup attempt left some files behind.
+The remaining files were identified and removed.
 
-I inspected the directory, removed the remaining temporary copies, and verified that the transfer directory no longer existed.
+The transfer directory was then removed and its absence verified.
 
 Temporary Windows image copies and the imported test certificate trust entry were also removed.
 
 The original dataset was preserved.
 
-## Stage 7 Findings
+## 10.8 Findings
 
-| Finding | Observation | Result |
+| Finding | Observation | Disposition |
 |---|---|---|
 | S7-F01 | Four image checksum checks | PASS |
 | S7-F02 | Three analysis checksum checks | PASS |
@@ -1001,342 +1090,306 @@ The original dataset was preserved.
 | S7-F04 | Embedded payload recovery | PASS |
 | S7-F05 | Temporary transfer cleanup | Verified |
 
-### How I Explain This to Franco
-
-"I wanted to ensure the results were supported by preserved evidence. Four image checks and three saved analysis checks passed. I also inspected the deployed Docker image and recovered the original hidden message directly from the modified PNG."
-
 ---
 
 # 11. Consolidated Investigation Timeline
 
-This table describes the logical order of the laboratory work.
+The following table represents the logical progression of the completed laboratory investigation.
 
 It is not a complete timestamped forensic chain of custody.
 
 | Stage | Activity | Outcome |
 |---|---|---|
-| 1 | Laboratory monitoring verification | Telemetry verified |
-| 2 | Independent image generation | Ground truth established |
-| 3 | Detector deployment | Healthy API and clean baseline |
-| 4 | Modified image validation | False negative observed |
-| 5 | Prediction comparison | Minimal score difference |
-| 6 | HTTPS and SOC investigation | Process attribution reconstructed |
-| 7 | Evidence verification | Hashes passed; payload recovered |
+| 1 | Monitoring preparation and troubleshooting | Required telemetry verified |
+| 2 | Independent dataset generation | Ground truth established |
+| 3 | Detector deployment and baseline | Clean image correctly classified |
+| 4 | Modified-image validation | False negative observed |
+| 5 | Error analysis | Minimal score separation identified |
+| 6 | SOC telemetry investigation | Process attribution reconstructed |
+| 7 | Integrity and reproducibility verification | Hashes passed and payload recovered |
 
 ## Recorded StegaShield Analysis Timestamps
 
-| Analysis | Timestamp (UTC) |
+| Analysis | Recorded Timestamp (UTC) |
 |---|---|
-| Clean baseline | 2026-11-17T19:42:37.944816672+00:00 |
+| Clean reference | 2026-11-17T19:42:37.944816672+00:00 |
 | Earlier modified analysis | 2026-11-17T20:01:39.687291170+00:00 |
 | Later modified analysis | 2026-11-17T20:05:19.979548339+00:00 |
 
-The subsequent HTTPS telemetry investigation was a separate controlled workflow.
+These timestamps originated from the saved API responses.
 
-These baseline timestamps should not be confused with the later Nginx access-log timestamps.
+The later HTTPS telemetry investigation was a separate controlled workflow.
+
+The analysis timestamps should not be conflated with the later Nginx access-log timestamps.
 
 ---
 
-# 12. Final Evidence Matrix
+# 12. Evidence Matrix
 
-| ID | Evidence | Purpose |
+| Evidence ID | Artifact or Observation | Supports |
 |---|---|---|
-| E01 | Sysmon and Splunk baseline | Monitoring readiness |
+| E01 | Sysmon and Splunk verification | Monitoring readiness |
 | E02 | Ground-truth manifest | Independent sample labels |
 | E03 | Clean-image generator | Clean sample provenance |
-| E04 | RGB-LSB embedding script | Modified sample provenance |
-| E05 | Original image SHA-256 hashes | Artifact identification |
+| E04 | RGB-LSB embedding script | Modification methodology |
+| E05 | Original image hashes | Artifact identification |
 | E06 | Docker readiness evidence | Application availability |
 | E07 | Clean-image analysis JSON | True-negative result |
 | E08 | Modified-image analysis JSON | False-negative result |
-| E09 | Earlier modified analysis JSON | Matching recorded prediction |
-| E10 | Nginx access records | HTTPS application activity |
+| E09 | Earlier modified analysis JSON | Repeated recorded prediction |
+| E10 | Nginx access records | Application request activity |
 | E11 | Zeek connection records | Network metadata |
 | E12 | Sysmon Event ID 3 | Endpoint network activity |
 | E13 | Sysmon Event ID 1 | Process attribution |
-| E14 | Reproduction scripts | Reproducibility procedure |
-| E15 | Four image checksum results | Artifact verification |
+| E14 | Reproduction scripts | Documented methodology |
+| E15 | Four image checksum results | Image integrity |
 | E16 | Three analysis checksum results | Response integrity |
 | E17 | Docker image metadata | Deployment identity |
-| E18 | Payload recovery output | Independent ground truth |
+| E18 | Payload recovery output | Independent payload verification |
 | E19 | Temporary cleanup verification | Cleanup evidence |
 
-These entries refer to the investigation evidence.
+These entries identify evidence observed during the investigation.
 
-They do not imply that every underlying raw artifact has been publicly uploaded.
+They do not imply that every underlying artifact is publicly available.
 
-The phase READMEs contain selected supporting screenshots and detailed technical findings.
+Selected screenshots and detailed investigation records are maintained in the individual phase documentation.
 
 ---
 
-# 13. Final Investigation Findings
+# 13. Consolidated Findings
 
 ## F01 — Controlled RGB-LSB False Negative
 
-**Severity:** Not assigned; research finding rather than a confirmed production vulnerability.
+**Category:** Detection validation.
 
-**Ground truth:** MODIFIED
+**Severity:** Not assigned.
 
-**Prediction:** clean
+**Observation:** StegaShield classified an independently modified RGB-LSB image as clean.
 
-**Probability:** 0.20640557
+**Ground truth:** MODIFIED.
 
-**Supporting evidence:** Ground truth, embedding script, preserved image, saved analysis, payload recovery.
+**Prediction:** clean.
+
+**Probability:** 0.20640557.
+
+**Supporting evidence:** Ground-truth manifest, embedding script, preserved image, model response, and successful payload recovery.
 
 **Disposition:** Confirmed for the tested sample.
 
 **Generalization:** Unknown.
 
-## F02 — Limited Score Separation
+## F02 — Minimal Probability Separation
 
-**Observation:** Clean and modified probabilities differed by only 0.00000003.
+**Category:** Detection error analysis.
+
+**Observation:** Clean and modified probabilities differed by 0.00000003.
 
 **Disposition:** Verified observation.
 
 **Root cause:** Not established.
 
-## F03 — Incomplete Process Attribution
+## F03 — Incomplete Network Process Attribution
 
-**Observation:** Sysmon Event ID 3 contained an unknown process image.
+**Category:** SOC telemetry investigation.
 
-**Supporting fields:** Source port 54306 and PID 10344.
+**Observation:** Event ID 3 contained `<unknown process>`.
 
-**Correlation:** Sysmon Event ID 1 identified `curl.exe` launched from PowerShell.
+**Supporting context:** Source port 54306 and PID 10344.
 
-**Disposition:** Process attribution supported.
+**Correlation:** Event ID 1 identified `curl.exe` launched from PowerShell.
+
+**Disposition:** Process attribution supported by correlated evidence.
 
 ## F04 — Evidence Integrity
 
-**Observation:** Four image checks and three saved analysis checks passed.
+**Category:** Reproducibility.
 
-**Disposition:** Verified against recorded checksums.
+**Observation:** Four image checksum checks and three analysis JSON checksum checks passed.
 
-## F05 — Payload Recovery
+**Disposition:** Verified relative to recorded fingerprints.
 
-**Observation:** The expected 23-byte payload was recovered from the modified PNG.
+## F05 — Independent Payload Recovery
+
+**Category:** Ground-truth validation.
+
+**Observation:** The original 23-byte payload was recovered from the modified PNG.
 
 **Disposition:** Verified.
 
 ---
 
-# 14. Remaining Questions & Research Gaps
+# 14. Research Limitations
 
-Future independent research could investigate:
+## 14.1 Small Dataset
 
-1. Detection behavior with larger RGB-LSB payloads
-2. Different payload densities
-3. Natural photographic carrier images
-4. Additional steganography algorithms
-5. Repeated testing with input-byte hashes recorded
-6. Effects of application preprocessing
-7. Structured image-hash and analysis-ID correlation
-8. Centralized Zeek and Nginx log ingestion
+The evaluation involved one clean image and one corresponding modified image.
 
-These are proposed research activities.
+This is insufficient for representative model-performance conclusions.
 
-They were not completed during this pilot.
+## 14.2 Synthetic Image Content
 
----
+The clean carrier contained pseudorandom RGB pixels.
 
-# 15. Recommendations for Franco's Technical Review
+The experiment did not establish performance on natural photographs.
 
-## Detector Evaluation
+## 14.3 Single Embedding Method
 
-Would a larger independently generated dataset help characterize performance across different LSB densities and carrier-image types?
+Only the controlled RGB-LSB embedding method was evaluated in the primary sample pair.
 
-## Model Assumptions
+## 14.4 Fixed Payload
 
-Are there documented expectations regarding supported image formats, embedding methods, or preprocessing?
+The tested payload was 23 bytes.
 
-## Reproducibility
+Different payload sizes and embedding densities were not evaluated.
 
-Could the API record each submitted image's SHA-256 fingerprint alongside its analysis identifier?
+## 14.5 Limited Model Internals
 
-## SOC Investigation
+The model's internal weights, training data, and preprocessing behavior were not independently audited.
 
-Which structured application logs would be most valuable for correlation with endpoint and network telemetry?
+The exact cause of the false negative remains unknown.
 
-## Future Testing
+## 14.6 Input Attribution
 
-Which additional controlled test cases would provide the greatest technical value before making broader performance claims?
+Saved analysis JSON files did not contain submitted-image SHA-256 fingerprints.
 
----
+This limited independent byte-level attribution across repeated submissions.
 
-# 16. Five-Minute Presentation Walkthrough
+## 14.7 Encrypted Network Visibility
 
-This section is my speaking guide for Franco.
+Zeek observed network connection metadata.
 
-## Opening
+It did not independently recover the embedded image contents from HTTPS traffic.
 
-"Hi Franco, thanks for meeting with me.
+## 14.8 Telemetry Centralization
 
-I completed the StegaShield Detection Validation Pilot and organized the practical work into seven stages.
+Windows Sysmon events were investigated in Splunk.
 
-My objective was to independently evaluate the detector, investigate unexpected results, correlate the associated activity using SOC telemetry, and verify the supporting evidence.
+Native ingestion of the specific Nginx and Zeek records into Splunk was not established.
 
-I documented the full process in GitHub so another analyst can understand the methodology and findings."
+## 14.9 Timestamp Correlation
 
-## Stage 1
+Complete cross-system clock synchronization was not independently demonstrated.
 
-"I started by verifying my SOC monitoring environment.
+## 14.10 Evidence Provenance
 
-Sysmon network events weren't appearing as expected, so I investigated the configuration and forwarding until the required activity became visible in Splunk."
+Checksum comparisons established agreement with recorded fingerprints.
 
-## Stage 2
-
-"I generated my own dataset using Python and Pillow.
-
-I created a clean RGB image and embedded a controlled 23-byte message into a modified copy.
-
-That gave me independent ground truth."
-
-## Stage 3
-
-"I deployed StegaShield using Docker on Ubuntu ARM64.
-
-The API was healthy, and the clean image was classified correctly."
-
-## Stage 4
-
-"I submitted the modified image containing the hidden payload.
-
-StegaShield classified it as clean.
-
-That was the main false-negative finding."
-
-## Stage 5
-
-"I compared the probabilities and found that the difference was only 0.00000003.
-
-I documented the observation without claiming to know the internal cause."
-
-## Stage 6
-
-"I investigated the HTTPS submissions using Nginx, Zeek, Sysmon, and Splunk.
-
-One network event had an unknown process image.
-
-I pivoted to the matching process creation event and identified curl.exe launched from PowerShell."
-
-## Stage 7
-
-"I verified the preserved evidence.
-
-Four image checks and three analysis JSON checks passed.
-
-I also recovered the original 23-byte payload directly from the modified PNG."
-
-## Closing
-
-"My conclusion is deliberately limited.
-
-StegaShield missed this particular independently verified RGB-LSB modification.
-
-The investigation also demonstrated process attribution through SOC telemetry correlation and successful evidence verification.
-
-Because the dataset was small, I cannot generalize the result to the detector's overall performance.
-
-I'd appreciate your feedback on the methodology and what test cases you would prioritize next."
+They did not establish a complete independent forensic chain of custody.
 
 ---
 
-# 17. Questions Franco May Ask
+# 15. Technical Recommendations
 
-## Q1. How do you know the modified image contained hidden data?
+The following items are proposed future research activities.
 
-I generated the modified image using a documented RGB-LSB script and subsequently recovered the exact 23-byte message from the preserved PNG.
+They were not completed during the original pilot.
 
-The ground truth did not rely on StegaShield's classification.
+## 15.1 Expand Independent Dataset Coverage
 
-## Q2. Why is this a false negative?
+Evaluate a larger number of independently labeled clean and modified images.
 
-The independently established ground truth was MODIFIED, but StegaShield predicted clean.
+Include natural photographic content and different image properties.
 
-## Q3. Does this mean StegaShield is ineffective?
+## 15.2 Vary Payload Conditions
 
-No.
+Evaluate different:
 
-The experiment established one missed detection under a specific controlled condition.
+- Payload sizes.
+- Embedding densities.
+- Carrier image types.
+- Embedding methods.
 
-A larger representative dataset would be needed to assess general performance.
+## 15.3 Improve Input-to-Response Attribution
 
-## Q4. Why were the probabilities almost identical?
+Record the exact SHA-256 fingerprint of each submitted image alongside the resulting analysis identifier.
 
-That remains unresolved.
+This would improve repeatability and evidence traceability.
 
-The observed scores were similar, but the investigation did not establish the internal cause.
+## 15.4 Strengthen Detection Evaluation
 
-## Q5. What did the SOC investigation demonstrate?
+Use a predefined evaluation methodology and a sufficiently representative dataset before calculating aggregate accuracy, precision, recall, or false-negative-rate estimates.
 
-It demonstrated correlation of authorized activity across endpoint, network, and application records.
+## 15.5 Improve Telemetry Correlation
 
-It also showed how Sysmon Event ID 1 helped resolve incomplete process attribution in Event ID 3.
+Consider structured application logging and centralized ingestion of relevant Nginx and Zeek records into the SIEM.
 
-## Q6. Did Zeek detect the embedded payload?
+## 15.6 Improve Time Synchronization
 
-No.
+Verify and document clock synchronization across Windows, Ubuntu, and the SIEM.
 
-Zeek recorded encrypted network connection metadata.
+## 15.7 Preserve Deployment Identity
 
-The payload was recovered separately from the preserved PNG.
+Record exact container image digests and relevant application versions.
 
-## Q7. Was the activity malicious?
-
-No.
-
-All submissions were authorized laboratory tests.
-
-The controlled steganographic payload did not establish malicious intent or exfiltration.
-
-## Q8. What would you improve?
-
-I would expand the independent dataset, test different carrier types and embedding conditions, record input SHA-256 hashes alongside API responses, and improve telemetry correlation.
+Avoid depending only on mutable image tags.
 
 ---
 
-# 18. Final Analyst Handoff
+# 16. Final Analyst Handoff
 
-## Confirmed Findings
+## Confirmed
 
-- StegaShield successfully deployed on Ubuntu ARM64
-- API readiness verified
-- Clean reference correctly classified
-- Controlled RGB-LSB sample incorrectly classified as clean
-- Original 23-byte payload independently recovered
-- Nginx recorded authorized analysis requests
-- Zeek recorded corresponding SSL connection metadata
-- Sysmon events were searchable in Splunk
-- Process attribution supported through Event IDs 1 and 3
-- Four image checksum checks passed
-- Three analysis JSON checksum checks passed
-- Running Docker image identity verified
-- Temporary transfer cleanup verified
+- StegaShield deployed successfully on Ubuntu ARM64.
+- Application readiness verified.
+- Known-clean image correctly classified.
+- Controlled RGB-LSB-modified image incorrectly classified as clean.
+- Two saved modified-image analyses reported matching predictions.
+- Nginx recorded successful authorized API requests.
+- Zeek recorded corresponding encrypted network connections.
+- Windows Sysmon events were searchable in Splunk.
+- Sysmon Event ID 1 supported process attribution for an incomplete Event ID 3 record.
+- Four image SHA-256 checks passed.
+- Three analysis JSON checksum checks passed.
+- Running Docker container image identity verified.
+- Original 23-byte embedded payload recovered.
+- Temporary transfer cleanup verified.
 
 ## Not Established
 
-- Overall StegaShield accuracy or reliability
-- Detection performance across other embedding methods
-- Generalization to natural photographs
-- Internal root cause of the false negative
-- Native StegaShield-to-Splunk integration
-- Decryption of HTTPS image contents through Zeek
-- Complete cross-system clock synchronization
-- Complete independent forensic chain of custody
+- Overall StegaShield accuracy.
+- General false-negative rate.
+- Detection performance for other embedding methods.
+- Generalization to natural photographs.
+- Internal root cause of the missed detection.
+- Native StegaShield-to-Splunk integration.
+- Decrypted network inspection of image contents.
+- Complete cross-system time synchronization.
+- Complete independent forensic chain of custody.
 
 ## Final Disposition
 
 **Investigation status:** Completed.
 
-**Primary finding:** One confirmed false negative for a controlled RGB-LSB-modified sample.
+**Primary detection result:** One confirmed false negative for a controlled RGB-LSB-modified sample.
 
-**Evidence confidence:** Supported by independent sample generation, recorded model responses, SHA-256 verification, and payload recovery.
+**Primary SOC finding:** Process attribution reconstructed using Sysmon Event IDs 3 and 1.
 
-**SOC conclusion:** Authorized image-submission activity was reconstructed through complementary endpoint, network, and application evidence.
+**Evidence verification:** Four image checks and three analysis JSON checks passed.
 
-**Recommended next action:** Review the findings with Franco and identify the next controlled test cases before drawing broader conclusions.
+**Ground-truth confirmation:** Original 23-byte payload successfully recovered.
+
+**Overall assessment:** The investigation demonstrated a specific missed detection within a controlled laboratory and a reproducible, evidence-driven SOC investigation workflow.
+
+The findings should not be generalized beyond the tested conditions without additional representative validation.
 
 ---
 
-**End of Investigation Notes**
+# 17. Supporting Documentation
 
-[Back to Main Project](README.md)
+| Phase | Technical Documentation |
+|---|---|
+| 01 | [Environment Baseline](phase-01-environment-baseline/README.md) |
+| 02 | [Independent Dataset](phase-02-independent-dataset/README.md) |
+| 03 | [Deployment Baseline](phase-03-deployment-baseline/README.md) |
+| 04 | [RGB-LSB Detection Validation](phase-04-lsb-detection-validation/README.md) |
+| 05 | [Error Analysis](phase-05-error-analysis/README.md) |
+| 06 | [SOC Telemetry Correlation](phase-06-soc-telemetry-correlation/README.md) |
+| 07 | [Reproducibility & Integrity](phase-07-reproducibility-integrity/README.md) |
+| 08 | [Final Technical Assessment](phase-08-final-assessment/README.md) |
+
+---
+
+**End of Technical Investigation Handoff**
+
+[Back to Project Overview](README.md)
+

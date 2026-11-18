@@ -13,7 +13,7 @@ The goal was not simply to demonstrate a working detection tool. I wanted to est
 
 The original hands-on pilot was structured across seven days. For GitHub documentation, I organized the completed work into eight phases, with the final phase serving as the consolidated technical assessment.
 
-Each phase contains its own investigation methodology, observations, discoveries, and selected supporting evidence.
+Each phase documents its own investigation methodology, observations, discoveries, and supporting evidence where available.
 
 ## Laboratory Architecture
 
@@ -74,6 +74,8 @@ Established the laboratory infrastructure and verified endpoint and network moni
 
 Investigated missing Sysmon Event ID 3 telemetry and verified network event collection in Splunk following remediation.
 
+**Documentation:** Text-only technical investigation.
+
 ### Phase 02 — Independent Dataset & Ground Truth
 
 Created an independently generated image dataset using Python and Pillow.
@@ -112,7 +114,7 @@ Reviewed image-generation and reproduction scripts, verified SHA-256 checksums, 
 
 Consolidates the investigation findings, evidence references, detection results, SOC observations, limitations, and recommendations into a final technical assessment.
 
-This is a documentation phase, not an additional experiment.
+**This is a documentation phase, not an additional experiment.**
 
 ---
 
@@ -148,13 +150,12 @@ Each phase distinguishes:
 - What the evidence supports
 - What remains unverified
 
-The individual phase READMEs provide the detailed commands, findings, and selected supporting screenshots.
+The individual phase READMEs contain the detailed methodology, technical observations, investigation findings, and relevant supporting evidence.
 
 ## Evidence & Reproducibility
 
 The project uses genuine laboratory evidence, including:
 
-- Screenshots of completed testing activities
 - Independent ground-truth records
 - Python generation and reproduction scripts
 - Original and modified image artifacts
@@ -165,12 +166,45 @@ The project uses genuine laboratory evidence, including:
 - Zeek network records
 - Nginx HTTPS access logs
 - Docker deployment metadata
+- Selected screenshots of completed laboratory activities
 
-Only screenshots that directly demonstrate a relevant action, observation, finding, or verification result will be selected for the published phase documentation.
+### Evidence Organization
 
-The screenshot archives collected during the pilot are source material, not automatically the final published evidence set.
+**Phase 01 — Text-Only Documentation**
 
-Original Phase 01 screenshots are still pending recovery. No missing screenshots will be substituted or represented as verified evidence.
+Phase 01 is intentionally documented without screenshots. Its README preserves the laboratory baseline, Sysmon troubleshooting, Splunk verification, technical findings, and limitations.
+
+**Phases 02–07 — Technical Documentation and Selected Screenshots**
+
+Each phase contains its own README and an `evidence/` directory with carefully selected, genuine laboratory screenshots.
+
+Only screenshots directly supporting a relevant action, observation, investigation, or verification result are included.
+
+The original screenshot archives are source material and are not automatically the final published evidence set.
+
+**Phase 08 — Consolidated Technical Assessment**
+
+Phase 08 brings together the completed research findings, evidence references, SOC observations, and recommendations.
+
+It references previous phases rather than duplicating their screenshots.
+
+### Evidence Integrity
+
+The reproducibility review confirmed:
+
+| Verification | Result |
+|---|---|
+| Original and reproduced image checksum checks | 4/4 PASS |
+| Saved analysis JSON checksum checks | 3/3 PASS |
+| Embedded 23-byte payload recovery | PASS |
+| Docker image identity inspection | Verified |
+| Temporary transfer directory cleanup | Verified |
+
+These results establish agreement with the recorded evidence and checksums under the tested conditions.
+
+They do not independently establish a complete forensic chain of custody.
+
+Detailed verification is documented in [Phase 07](phase-07-reproducibility-integrity/README.md).
 
 ## Scope & Limitations
 
@@ -188,6 +222,8 @@ Encrypted network connection metadata was investigated separately from the appli
 
 A steganography classification does not independently establish malicious activity or data exfiltration.
 
+The model's internal architecture, training process, and learned features were not independently audited.
+
 ## Final Conclusion
 
 The pilot demonstrated one correct clean-image classification and one missed detection of a controlled RGB-LSB modification.
@@ -196,9 +232,8 @@ The project also demonstrated the importance of verifying endpoint telemetry, co
 
 The central lesson was that meaningful detection validation requires independent ground truth, controlled experimentation, and conclusions supported by actual evidence.
 
-For the complete technical investigations, screenshots, and discoveries, explore the individual phases above.
+For the complete technical investigations, selected screenshots, discoveries, and research limitations, explore the individual phases above.
 
 ---
 
 **Independent Cybersecurity Research | SOC Investigation | Detection Validation**
-

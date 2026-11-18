@@ -1,240 +1,285 @@
 
-# StegaShield Detection Validation Pilot
+# Phase 01 — Environment & Laboratory Baseline
 
-**Independent Detection Validation | SOC Investigation | Reproducibility**
+**StegaShield Detection Validation Pilot**
 
-An evidence-driven cybersecurity research project evaluating StegaShield's image steganography detection behavior within a controlled SOC laboratory.
+**Focus:** Laboratory readiness, endpoint telemetry, network monitoring, and Sysmon Event ID 3 investigation.
 
-## Project Overview
+[Back to Main Project](../README.md)
 
-I conducted this independent pilot to investigate how StegaShield classifies known-clean and genuinely steganographically modified images.
+---
 
-The goal was not simply to demonstrate a working detection tool. I wanted to establish independent ground truth, test the engine under controlled conditions, investigate unexpected results, and verify whether the associated activity could be reconstructed using SOC telemetry.
+## Objective
 
-The original hands-on pilot was structured across seven days. For GitHub documentation, I organized the completed work into eight phases, with the final phase serving as the consolidated technical assessment.
+Before testing StegaShield, I needed to establish a reliable laboratory environment and verify that my monitoring tools were producing usable security telemetry.
 
-Each phase documents its own investigation methodology, observations, discoveries, and supporting evidence where available.
+My objective was not simply to confirm that the tools were installed.
 
-## Laboratory Architecture
+I wanted to verify that network activity could be observed, Windows events could be collected, and the resulting evidence could be investigated in Splunk Enterprise.
 
-The pilot used a Mac M2 host running Splunk Enterprise, together with Windows 11 and Ubuntu ARM64 virtual machines.
+The initial investigation focused on Windows Sysmon, Splunk, Zeek, and Docker readiness.
 
-The Windows endpoint generated controlled activity and provided Sysmon telemetry. Ubuntu hosted the image-analysis environment and network monitoring components.
+## Laboratory Environment
 
-![StegaShield Detection Validation Lab Architecture](assets/lab-architecture.png)
+The pilot used a Mac M2 host with Windows 11 and Ubuntu virtual machines.
 
-**Architecture note:** This is the original laboratory design diagram. It includes both operational components and initially planned integrations. Components shown in the diagram should not automatically be interpreted as successfully integrated or used during the final experiment.
-
-The verified monitoring and testing paths are documented in the relevant phases.
-
-### Core Technologies
-
-| Technology | Purpose |
-|---|---|
-| Windows 11 ARM64 | Controlled endpoint activity |
-| Ubuntu 24.04 ARM64 | Detection service and network analysis |
-| Splunk Enterprise | Centralized SOC investigation |
-| Sysmon | Windows process and network telemetry |
-| Splunk Universal Forwarder | Windows log forwarding |
-| Zeek | Network connection metadata |
-| Docker | StegaShield container deployment |
-| Nginx | HTTPS reverse proxy |
-| Python and Pillow | Independent image generation and modification |
-
-## Research Objectives
-
-The project focused on the following questions:
-
-1. Can StegaShield correctly classify a known-clean image?
-2. Can it identify an image containing a genuine RGB-LSB modification?
-3. How do the model's probabilities differ between matching clean and modified images?
-4. Can an embedded payload be independently verified and recovered?
-5. Can Sysmon, Splunk, Zeek, and Nginx evidence support investigation of controlled image submissions?
-6. Are the test artifacts and findings reproducible?
-7. What limitations should be considered before drawing broader conclusions?
-
-## Project Phases
-
-The complete investigation is organized into eight phases.
-
-| Phase | Investigation | Documentation |
+| Component | Technology | Purpose |
 |---|---|---|
-| 01 | Environment & Laboratory Baseline | [View Phase 01](phase-01-environment-baseline/README.md) |
-| 02 | Independent Dataset & Ground Truth | [View Phase 02](phase-02-independent-dataset/README.md) |
-| 03 | StegaShield Deployment & Clean Baseline | [View Phase 03](phase-03-deployment-baseline/README.md) |
-| 04 | RGB-LSB Detection Validation | [View Phase 04](phase-04-lsb-detection-validation/README.md) |
-| 05 | Error Analysis & Generalization Limits | [View Phase 05](phase-05-error-analysis/README.md) |
-| 06 | HTTPS & SOC Telemetry Correlation | [View Phase 06](phase-06-soc-telemetry-correlation/README.md) |
-| 07 | Reproducibility & Evidence Integrity | [View Phase 07](phase-07-reproducibility-integrity/README.md) |
-| 08 | Consolidated Technical Assessment | [View Phase 08](phase-08-final-assessment/README.md) |
+| Host | Mac M2 | Laboratory management |
+| SIEM | Splunk Enterprise | Centralized event investigation |
+| Windows endpoint | Windows 11 ARM64 | Controlled endpoint activity |
+| Endpoint monitoring | Sysmon | Process and network telemetry |
+| Log forwarding | Splunk Universal Forwarder | Windows event ingestion |
+| Linux VM | Ubuntu 24.04 ARM64 | Network monitoring and analysis |
+| Network sensor | Zeek | Connection and HTTP metadata |
+| Container runtime | Docker | StegaShield deployment preparation |
 
-### Phase 01 — Environment & Laboratory Baseline
+The main telemetry path was:
 
-Established the laboratory infrastructure and verified endpoint and network monitoring.
+Windows Activity → Sysmon → Splunk Universal Forwarder → Splunk Enterprise
 
-Investigated missing Sysmon Event ID 3 telemetry and verified network event collection in Splunk following remediation.
+Zeek independently recorded network activity visible on its monitored Ubuntu interface.
 
-**Documentation:** Text-only technical investigation.
+## 1. Splunk Enterprise Connectivity
 
-### Phase 02 — Independent Dataset & Ground Truth
+I started by checking whether Splunk Enterprise was operational on my Mac.
 
-Created an independently generated image dataset using Python and Pillow.
+I inspected the Splunk management listener and confirmed that the service was listening.
 
-Established clean and RGB-LSB-modified samples with known labels, controlled payloads, and SHA-256 fingerprints.
+Next, I tested connectivity from Ubuntu to the Splunk management endpoint.
 
-### Phase 03 — StegaShield Deployment & Clean Baseline
+The controlled HTTPS request returned HTTP 200 OK, and the response identified Splunkd as the responding service.
 
-Deployed StegaShield on Ubuntu using Docker.
+This confirmed that Ubuntu could reach the Splunk management service.
 
-Verified the detection service and established a baseline classification using a known-clean image.
+![Ubuntu to Splunk Connectivity](evidence/01-splunk-connectivity.png)
 
-### Phase 04 — RGB-LSB Detection Validation
+**Observation:** Splunk was accessible from Ubuntu over the tested network path.
 
-Evaluated StegaShield against an image containing a genuine 23-byte RGB-LSB embedded payload.
+**Limitation:** Successful connectivity did not establish that Ubuntu logs were being forwarded to Splunk.
 
-Recorded the model's response and compared it against independent ground truth.
+## 2. Zeek Network Monitoring
 
-### Phase 05 — Error Analysis & Generalization Limits
+My next step was to verify that Zeek was collecting network telemetry.
 
-Investigated the observed false-negative classification.
+I inspected the standalone Zeek configuration, checked the monitored interface, and verified the sensor's running state.
 
-Compared model probabilities, reviewed repeated analysis records, and documented the limitations of the controlled experiment.
+![Zeek Running Status](evidence/02-zeek-status.png)
 
-### Phase 06 — HTTPS & SOC Telemetry Correlation
+I then inspected the connection logs.
 
-Performed authorized HTTPS image submissions from Windows to Ubuntu.
+Zeek had recorded actual network activity, including TCP, UDP, DHCP, and ICMP traffic.
 
-Investigated process, network, and application activity using Sysmon, Splunk, Zeek, and Nginx.
+![Zeek Connection Records](evidence/03-zeek-connections.png)
 
-### Phase 07 — Reproducibility & Evidence Integrity
+I also inspected the HTTP log and observed a GET request with an HTTP 204 No Content response.
 
-Reviewed image-generation and reproduction scripts, verified SHA-256 checksums, recovered the embedded payload, and confirmed temporary-file cleanup.
+These checks demonstrated that Zeek was generating network metadata.
 
-### Phase 08 — Consolidated Technical Assessment
+**Observation:** Zeek was operational and producing connection and HTTP records.
 
-Consolidates the investigation findings, evidence references, detection results, SOC observations, limitations, and recommendations into a final technical assessment.
+**Limitation:** This did not establish complete visibility into all virtual-machine traffic or encrypted HTTPS image contents.
 
-**This is a documentation phase, not an additional experiment.**
+## 3. Sysmon Network Telemetry Investigation
 
----
+This was the most important investigation in Phase 01.
 
-## Key Research Findings
+I verified that Sysmon was installed and that its driver was running.
 
-The controlled test produced the following detection outcomes:
+Process creation and termination events were already present.
 
-| Sample | Ground Truth | Prediction | Result |
-|---|---|---|---|
-| Clean reference image | CLEAN | clean | True Negative |
-| RGB-LSB modified image | MODIFIED | clean | False Negative |
+However, I noticed that Sysmon Event ID 3, which records network connections, was missing from the inspected local event log.
 
-StegaShield correctly classified the clean reference image but failed to identify the corresponding image containing a controlled 23-byte RGB-LSB payload.
+This was a problem because later SOC investigations would require network connections to be associated with their originating Windows processes.
 
-The modified image was classified as `clean`, despite independently established ground truth and subsequent successful payload recovery.
+### Initial Investigation
 
-The investigation also demonstrated how multiple SOC telemetry sources could be correlated to reconstruct the authorized image submissions.
+I inspected Sysmon's active configuration.
 
-**These findings apply to the specific samples and tested deployment. They do not establish overall StegaShield accuracy, production reliability, or performance across other steganography methods.**
+Network connection monitoring was reported as enabled, but I still could not find the expected Event ID 3 records.
 
-## Investigation Methodology
+![Initial Sysmon Configuration](evidence/04-sysmon-initial-config.png)
 
-The pilot followed an evidence-driven workflow:
+I investigated several possible explanations, including:
 
-**Baseline → Controlled Activity → Observation → Investigation → Correlation → Verification → Documentation**
+- Sysmon service and driver status
+- Registered driver configuration
+- Driver binary and version
+- Digital signature validity
+- Event schema
+- Retained error events
+- Existing monitoring settings
 
-Each phase distinguishes:
+The driver was running and Windows reported a valid digital signature.
 
-- What I intended to test
-- What I actually performed
-- What the tools returned
-- What I discovered
-- What the evidence supports
-- What remains unverified
+A search for retained Sysmon Event ID 255 records returned no matches.
 
-The individual phase READMEs contain the detailed methodology, technical observations, investigation findings, and relevant supporting evidence.
+These checks did not conclusively identify the root cause.
 
-## Evidence & Reproducibility
+### Remediation
 
-The project uses genuine laboratory evidence, including:
+I prepared a minimal Sysmon XML configuration containing explicit collection rules for:
 
-- Independent ground-truth records
-- Python generation and reproduction scripts
-- Original and modified image artifacts
-- SHA-256 integrity verification
-- Saved StegaShield API responses
-- Windows Sysmon events
-- Splunk investigation results
-- Zeek network records
-- Nginx HTTPS access logs
-- Docker deployment metadata
-- Selected screenshots of completed laboratory activities
-
-### Evidence Organization
-
-**Phase 01 — Text-Only Documentation**
-
-Phase 01 is intentionally documented without screenshots. Its README preserves the laboratory baseline, Sysmon troubleshooting, Splunk verification, technical findings, and limitations.
-
-**Phases 02–07 — Technical Documentation and Selected Screenshots**
-
-Each phase contains its own README and an `evidence/` directory with carefully selected, genuine laboratory screenshots.
-
-Only screenshots directly supporting a relevant action, observation, investigation, or verification result are included.
-
-The original screenshot archives are source material and are not automatically the final published evidence set.
-
-**Phase 08 — Consolidated Technical Assessment**
-
-Phase 08 brings together the completed research findings, evidence references, SOC observations, and recommendations.
-
-It references previous phases rather than duplicating their screenshots.
-
-### Evidence Integrity
-
-The reproducibility review confirmed:
-
-| Verification | Result |
+| Event ID | Description |
 |---|---|
-| Original and reproduced image checksum checks | 4/4 PASS |
-| Saved analysis JSON checksum checks | 3/3 PASS |
-| Embedded 23-byte payload recovery | PASS |
-| Docker image identity inspection | Verified |
-| Temporary transfer directory cleanup | Verified |
+| 1 | Process Creation |
+| 3 | Network Connection |
+| 5 | Process Termination |
 
-These results establish agreement with the recorded evidence and checksums under the tested conditions.
+I preserved a report of the original configuration before applying the change.
 
-They do not independently establish a complete forensic chain of custody.
+After applying the XML file, Sysmon reported that the configuration had been successfully validated and updated.
 
-Detailed verification is documented in [Phase 07](phase-07-reproducibility-integrity/README.md).
+![Sysmon Configuration Update](evidence/05-sysmon-config-update.png)
 
-## Scope & Limitations
+### Verification
 
-This was a controlled, non-production research pilot.
+I generated another controlled TCP connection and inspected the local Sysmon Operational log.
 
-The primary validation used one synthetic clean image and one corresponding RGB-LSB-modified image.
+This time, Event ID 3 records appeared.
 
-The results do not establish performance across natural photographs, broader image datasets, additional embedding techniques, or different payload sizes.
+![Local Sysmon Event ID 3](evidence/06-sysmon-event3-local.png)
 
-Dataset A was identified as external reference material and was reportedly associated with the product team's training/testing workflow. It was not used to establish independent generalization.
+The records contained information such as:
 
-The experiment did not establish native StegaShield-to-Splunk integration.
+- Process ID and process GUID
+- Executable path
+- Source IP address and port
+- Destination IP address and port
+- Protocol
+- Timestamp
+- User context
 
-Encrypted network connection metadata was investigated separately from the application-level image analysis.
+**Finding:** Sysmon network connection telemetry was successfully restored following the configuration change.
 
-A steganography classification does not independently establish malicious activity or data exfiltration.
+The exact root cause of the original missing events remained inconclusive.
 
-The model's internal architecture, training process, and learned features were not independently audited.
+## 4. Splunk Forwarding Investigation
 
-## Final Conclusion
+During baseline preparation, I also encountered a separate issue.
 
-The pilot demonstrated one correct clean-image classification and one missed detection of a controlled RGB-LSB modification.
+The Splunk Universal Forwarder initially received an access-denied error when attempting to subscribe to the Sysmon Operational event channel.
 
-The project also demonstrated the importance of verifying endpoint telemetry, correlating multiple evidence sources, and preserving reproducible testing artifacts.
+I investigated the forwarder service identity and event-channel permissions.
 
-The central lesson was that meaningful detection validation requires independent ground truth, controlled experimentation, and conclusions supported by actual evidence.
+The service identity was added to the local Event Log Readers group, and the forwarder service was restarted.
 
-For the complete technical investigations, selected screenshots, discoveries, and research limitations, explore the individual phases above.
+Subsequent searches confirmed that Sysmon events were reaching Splunk.
+
+I then searched for Event ID 3 records.
+
+![Sysmon Event ID 3 in Splunk](evidence/07-splunk-event3.png)
+
+The results showed network connection events from the Windows endpoint.
+
+One record associated the Splunk Universal Forwarder process with an outbound connection to the Splunk receiving service.
+
+This verified the telemetry path:
+
+Windows Network Activity → Sysmon Event ID 3 → Splunk Universal Forwarder → Splunk Enterprise
+
+## 5. Final Telemetry Verification
+
+After restoring the missing telemetry, I performed a final Splunk search covering a 30-minute window.
+
+The search returned:
+
+| Event ID | Description | Events Observed |
+|---|---|---:|
+| 1 | Process Creation | 215 |
+| 3 | Network Connection | 52 |
+| 5 | Process Termination | 217 |
+| 16 | Configuration Change | 1 |
+| **Total** | | **485** |
+
+![Final Splunk Event Coverage](evidence/08-splunk-final-events.png)
+
+These counts represent the observed search window, not permanent system totals.
+
+The results confirmed that process creation, network connections, process termination, and configuration changes were searchable in Splunk.
+
+## 6. Investigation Findings
+
+### Finding 01 — Missing Sysmon Event ID 3
+
+**Initial observation:** Network connection events were absent from the inspected local log.
+
+**Investigation:** Reviewed configuration, driver state, signatures, error records, and controlled network activity.
+
+**Action:** Applied a validated Sysmon configuration with explicit collection rules.
+
+**Verification:** Event ID 3 appeared locally and in Splunk.
+
+**Disposition:** Resolved.
+
+**Root cause:** Not conclusively established.
+
+### Finding 02 — Splunk Forwarding Access Denied
+
+**Initial observation:** The forwarder could not subscribe to the Sysmon Operational channel.
+
+**Investigation:** Reviewed service identity and event-channel permissions.
+
+**Action:** Updated Event Log Readers membership and restarted the forwarder.
+
+**Verification:** Sysmon records became searchable in Splunk.
+
+**Disposition:** Resolved.
+
+### Finding 03 — Network Visibility Boundaries
+
+**Observation:** Zeek generated actual network connection and HTTP metadata.
+
+**Limitation:** Complete virtual-machine traffic visibility and encrypted image-content inspection were not established.
+
+**Disposition:** Documented for subsequent investigation phases.
+
+## 7. What I Discovered
+
+The most important lesson from Phase 01 was that an enabled security feature does not automatically guarantee usable telemetry.
+
+Initially, Sysmon was running and network monitoring was reported as enabled.
+
+However, Event ID 3 was still missing.
+
+I had to investigate the configuration, perform controlled network activity, verify local event generation, and then confirm centralized ingestion in Splunk.
+
+This taught me to distinguish between three questions:
+
+1. Did the activity happen?
+2. Did the endpoint generate the expected event?
+3. Did the SIEM successfully receive and index that event?
+
+Each question requires separate evidence.
+
+## 8. Limitations
+
+The investigation did not conclusively establish the original cause of the missing Sysmon Event ID 3 events.
+
+Zeek's operational status did not prove complete visibility into every laboratory network path.
+
+Ubuntu log forwarding to Splunk was not independently verified during this baseline.
+
+StegaShield detection performance was outside the scope of Phase 01.
+
+## Conclusion
+
+Phase 01 established a working laboratory telemetry baseline.
+
+I verified Splunk connectivity, operational Zeek logging, Windows Sysmon events, and centralized Sysmon ingestion.
+
+The investigation identified and resolved two separate problems affecting network event collection and forwarding.
+
+The main lesson was that security monitoring must be verified through actual events rather than assumptions about tool configuration.
+
+**Phase 01 Outcome: Core technical baseline verified.**
+
+**Evidence publication status:** The original Phase 01 screenshots remain pending recovery and upload. The image references above identify the intended evidence locations and will render only after genuine screenshots are added.
 
 ---
 
-**Independent Cybersecurity Research | SOC Investigation | Detection Validation**
+**Next: [Phase 02 — Independent Dataset & Ground Truth](../phase-02-independent-dataset/README.md)**
+
+[Back to Main Project](../README.md)
+
 
